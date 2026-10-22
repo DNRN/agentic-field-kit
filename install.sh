@@ -65,6 +65,16 @@ mapfile -t ALL < <(compgen -W "agents claude omp")
 if [ "${#HARNESSES[@]}" -eq 0 ]; then HARNESSES=("${ALL[@]}"); fi
 for h in "${HARNESSES[@]}"; do target_dir "$h" >/dev/null || die "unknown harness: $h"; done
 
+# Ours: a symlink into this repo's skills/, or a copy carrying our marker.
+# Anything else at a destination belongs to the user and is never replaced.
+ours() {
+  if [ -L "$1" ]; then
+    case "$(readlink "$1")" in "$SKILLS_SRC"/*) return 0 ;; esac
+    return 1
+  fi
+  [ -f "$1/.agentic-toolkit-install" ]
+}
+
 status=0
 for src in "$SKILLS_SRC"/*/; do
   name=$(basename "$src")
@@ -72,23 +82,18 @@ for src in "$SKILLS_SRC"/*/; do
   for h in "${HARNESSES[@]}"; do
     dst="$(target_dir "$h")/$name"
     if [ "$ACTION" = remove ]; then
-      if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
-        rm "$dst"; echo "removed $dst"
-      elif [ -f "$dst/.agentic-toolkit-install" ]; then
-        rm -rf "$dst"; echo "removed $dst"
-      fi
+      if ours "$dst"; then rm -rf "$dst"; echo "removed $dst"; fi
       continue
     fi
+    if [ -L "$dst" ] || [ -e "$dst" ]; then
+      if ! ours "$dst"; then echo "skip $dst (exists, not installed by agentic-toolkit)"; status=1; continue; fi
+      if [ "$MODE" = symlink ] && [ "$(readlink "$dst")" = "$src" ]; then continue; fi
+      rm -rf "$dst"
+    fi
+    mkdir -p "$(dirname "$dst")"
     if [ "$MODE" = symlink ]; then
-      if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then continue; fi
-      if [ -e "$dst" ]; then
-        if [ -L "$dst" ]; then rm "$dst"; else echo "skip $dst (real directory exists)"; status=1; continue; fi
-      fi
-      mkdir -p "$(dirname "$dst")"
       ln -s "$src" "$dst"; echo "linked   $dst -> $src"
     else
-      rm -rf "$dst"
-      mkdir -p "$(dirname "$dst")"
       cp -R "$src" "$dst"
       echo "$REPO" > "$dst/.agentic-toolkit-install"
       echo "copied   $dst"
