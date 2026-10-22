@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scripts:
+    name: Shellcheck and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shellcheck
+        run: shellcheck install.sh hooks/scripts/*.sh tests/*.sh
+      - name: Skill portability (install.sh --check)
+        run: ./install.sh --check
+      - name: Regression tests
+        run: bash tests/run.sh
+
+  plugin:
+    name: Plugin manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Validate marketplace (strict)
+        run: claude plugin validate --strict .
+      # Not --strict: the validator scans agents/ and commands/ and warns on
+      # their README.md, although plugin.json's explicit lists keep those
+      # files from loading. tests/plugin-manifest.test.sh guards the lists.
+      - name: Validate plugin manifest and components
+        run: claude plugin validate .claude-plugin/plugin.json
+
+  docs:
+    name: Links and diagrams
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check internal links and anchors
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --include-fragments --no-progress '**/*.md'
+          fail: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Render every mermaid diagram
+        run: |
+          echo '{"args":["--no-sandbox"]}' > "$RUNNER_TEMP/puppeteer.json"
+          mapfile -t files < <(git grep -l '^```mermaid' -- '*.md')
+          if [ "${#files[@]}" -eq 0 ]; then echo "no mermaid diagrams"; exit 0; fi
+          status=0
+          for f in "${files[@]}"; do
+            echo "::group::$f"
+            out="$RUNNER_TEMP/mermaid/$(dirname "$f")"
+            mkdir -p "$out"
+            npx -y @mermaid-js/mermaid-cli@11 -p "$RUNNER_TEMP/puppeteer.json" -i "$f" -o "$out/$(basename "$f")" || { echo "::error file=$f::mermaid diagram failed to render"; status=1; }
+            echo "::endgroup::"
+          done
+          exit "$status"

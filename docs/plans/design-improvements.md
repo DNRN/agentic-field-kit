@@ -8,13 +8,14 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 | --- | --- | --- | --- |
 | D1 | ~~Accept ADRs 0001–0003~~ — done | — | status flip only |
 | D2 | ~~Commit outstanding work~~ — done | D1 | — |
-| D3 | CI pipeline | — | — |
+| D3 | ~~CI pipeline~~ — done | — | — |
 | D4 | Configurable docs paths for the docs check | D3 | supersedes 0003's trigger rule |
 | D5 | Hook prefilter for non-commit Bash calls | D3 | — |
 | D6 | Single-source review and audit rubrics | — | — |
 | D7 | Convert evals to `claude plugin eval` format | D6 | — |
 | D8 | Document and prevent duplicate skill loading | — | — |
 | D9 | Release hygiene: `.gitignore`, CHANGELOG, version tags | D3 | — |
+| D10 | Resolve `code-review` / `doc-sync` skill-command name collisions | — | — |
 
 ## D1. Accept ADRs 0001–0003 — done
 
@@ -32,20 +33,21 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 
 **Acceptance.** `git status` clean; each commit passed or consciously waived the gate. Done 2026-10-22 (`0de25d1`…`ce917e1`); the gate did not run, since the committing session did not load the plugin.
 
-## D3. CI pipeline
+## D3. CI pipeline — done
 
-**Problem.** Nothing runs automatically; a broken link and a gate bypass shipped unnoticed.
+**Problem.** Nothing ran automatically: shell bugs, broken links, and invalid manifests could reach `main` unnoticed.
 
-**Change.** `.github/workflows/ci.yml` on push and PR:
+**Change.** `.github/workflows/ci.yml` on push to `main` and on every PR, three jobs:
 
-- `shellcheck install.sh hooks/scripts/*.sh tests/*.sh`
-- `tests/run.sh` (gate and installer regression tests)
-- `./install.sh --check`
-- `claude plugin validate .` (skip with a notice if the CLI is unavailable in CI)
-- markdown link check over `*.md`
-- mermaid syntax check (`mmdc`) over embedded diagrams
+- **scripts**: `shellcheck install.sh hooks/scripts/*.sh tests/*.sh`, `./install.sh --check`, `tests/run.sh`
+- **plugin**: installs the Claude Code CLI; `claude plugin validate --strict .` (marketplace) and `claude plugin validate .claude-plugin/plugin.json` (not strict: the validator scans `agents/` and `commands/` and warns on their `README.md`, which the manifest's explicit lists keep from loading)
+- **docs**: lychee over `**/*.md`, offline, internal links and `#anchors`; every file with a mermaid block rendered by `@mermaid-js/mermaid-cli`
 
-**Acceptance.** A PR that breaks any of the above fails CI.
+A link check catches missing files and anchors, not a link to the wrong existing file (the original doc-sync link bug); that remains the doc-auditor's job.
+
+**Acceptance.** A PR that breaks any of the above fails CI. Done 2026-10-22: every step runs green locally (actionlint-clean workflow); an unregistered agent, a missing link target, and a broken mermaid diagram each fail their step.
+
+**Found while wiring CI.** Claude Code loaded `agents/README.md` as an agent and `commands/README.md` as a command (`agentic-toolkit:README`, seen in a headless session's init event). `plugin.json` now lists `agents`, `commands`, and `outputStyles` explicitly (these keys replace the folder scan); `tests/plugin-manifest.test.sh` fails when a component file is not listed. `claude plugin details` reports `Agents (0)` under explicit lists, while a real session loads both agents, so don't use it to check this.
 
 ## D4. Configurable docs paths for the docs check
 
@@ -94,6 +96,14 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 **Change.** `.gitignore` (`evals/results/`), `CHANGELOG.md` (Keep a Changelog), bump `plugin.json` version per release, tag with `claude plugin tag`.
 
 **Acceptance.** Each release has a changelog entry, a version bump, and a tag.
+
+## D10. Skill-command name collisions
+
+**Problem.** `skills/code-review` and `commands/code-review.md` both register as `agentic-toolkit:code-review`, and the same goes for doc-sync. A headless session lists one `agentic-toolkit:code-review` slash command, so one definition shadows the other. Which one wins, and whether the skill's auto-trigger still fires, is unverified.
+
+**Change.** Check precedence. Then either rename the commands (e.g. `/agentic-toolkit:review`) or drop them in favor of the skills with explicit-invocation metadata, following `commands/README.md`'s own advice. Update ADRs 0002/0003 if the four-layer structure changes.
+
+**Acceptance.** Every component name is unique in a session's init event; the review and doc-sync flows still start from both the user command and the skill trigger.
 
 ## Done
 
