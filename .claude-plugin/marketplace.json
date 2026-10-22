@@ -1,0 +1,14 @@
+{
+  "name": "agentic-toolkit",
+  "description": "Personal collection of agent components shared across projects: skills, agents, commands, hooks, styles, rules, and templates",
+  "owner": {
+    "name": "dnrn"
+  },
+  "plugins": [
+    {
+      "name": "agentic-toolkit",
+      "source": ".",
+      "description": "Shared agents, skills, commands, hooks, output styles, rules, and templates for coding agents"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "agentic-toolkit",
+  "version": "0.1.0",
+  "description": "Shared agents, skills, commands, hooks, output styles, rules, and templates for coding agents",
+  "author": {
+    "name": "dnrn"
+  },
+  "repository": "https://github.com/dnrn/agentic-toolkit",
+  "license": "MIT",
+  "keywords": ["agents", "skills", "commands", "hooks", "rules", "templates"]
+}
