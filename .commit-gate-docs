@@ -1,0 +1,6 @@
+# Paths the commit gate counts as documentation (docs/adr/0004).
+# One git pathspec per line, relative to the repository root.
+# Skills, agents, commands, and evals are markdown too, but they are code here.
+docs/
+README.md
+*/README.md

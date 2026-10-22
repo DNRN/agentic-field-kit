@@ -114,11 +114,56 @@ done
 
 echo "# docs check"
 new_repo; stage code.py
-expect_reason "documentation" "code without docs raises the docs check" "git commit -m x"
+expect_reason "documentation (" "code without docs raises the docs check" "git commit -m x"
 stamp --stamp-docs "$REPO"
 expect_no_reason "documentation (" "docs stamp clears the docs check" "git commit -m x"
 stage README.md
 expect_no_reason "documentation (" "doc edit in the commit satisfies the docs check" "git commit -m x"
+
+echo "# docs paths from .commit-gate-docs"
+# configure <content>: commit a .commit-gate-docs plus docs/guide.md,
+# docs/a/deep.md, skills/x/SKILL.md, and guide.rst in a fresh repo.
+configure() {
+  new_repo
+  mkdir -p "$REPO/docs/a" "$REPO/skills/x"
+  for f in docs/guide.md docs/a/deep.md skills/x/SKILL.md guide.rst; do echo a > "$REPO/$f"; done
+  printf '%b' "$1" > "$REPO/.commit-gate-docs"
+  git -C "$REPO" add -A; git -C "$REPO" commit -qm config
+}
+configure '# docs live here\r\n\n  docs/  \r\nREADME.md'
+stage skills/x/SKILL.md
+expect_reason "documentation (" "markdown outside docs paths is code (comments, blanks, CRLF, padding ignored)" "git commit -m x"
+stage docs/guide.md
+expect_no_reason "documentation (" "edit under a configured docs path satisfies the docs check" "git commit -m x"
+configure 'docs/\nREADME.md'
+stage code.py; stage README.md
+expect_no_reason "documentation (" "configured single file counts as docs" "git commit -m x"
+stamp --stamp-review "$REPO"
+stage docs/guide.md
+expect allow "configured doc edit after review keeps the review" "git commit -m x"
+stage skills/x/SKILL.md
+expect_reason "code review" "markdown outside docs paths after review needs review" "git commit -m x"
+configure 'docs/'
+stage skills/x/SKILL.md
+stamp --stamp-docs "$REPO"
+expect_no_reason "documentation (" "docs stamp matches under configured paths" "git commit -m x"
+configure '*.rst'
+stage code.py; stage guide.rst
+expect_no_reason "documentation (" "non-markdown docs (*.rst) satisfy the docs check" "git commit -m x"
+git -C "$REPO" reset -q guide.rst; stage README.md
+expect_reason "documentation (" "markdown is code when only *.rst counts as docs" "git commit -m x"
+configure '# nothing configured\n'
+stage code.py; stage README.md
+expect_no_reason "documentation (" "comment-only file falls back to *.md" "git commit -m x"
+configure 'site/'
+stage code.py
+expect_no_reason "documentation (" "no tracked file under docs paths: docs check off" "git commit -m x"
+configure ':(glob)docs/**'
+stage code.py
+stamp --stamp-review "$REPO"
+stage docs/a/deep.md
+expect allow "long-form pathspec magic is excluded from the code-only hash" "git commit -m x"
+expect_no_reason "documentation (" "long-form pathspec magic counts as docs" "git commit -m x"
 
 [ "$fails" -eq 0 ] && echo "commit-gate: all passed" || echo "commit-gate: $fails failed"
 [ "$fails" -eq 0 ]

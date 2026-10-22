@@ -9,7 +9,7 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 | D1 | ~~Accept ADRs 0001–0003~~ — done | — | status flip only |
 | D2 | ~~Commit outstanding work~~ — done | D1 | — |
 | D3 | ~~CI pipeline~~ — done | — | — |
-| D4 | Configurable docs paths for the docs check | D3 | supersedes 0003's trigger rule |
+| D4 | ~~Configurable docs paths for the docs check~~ — done | D3 | [0004](../adr/0004-configurable-docs-paths.md) supersedes 0003's trigger rule |
 | D5 | Hook prefilter for non-commit Bash calls | D3 | — |
 | D6 | Single-source review and audit rubrics | — | — |
 | D7 | Convert evals to `claude plugin eval` format | D6 | — |
@@ -49,15 +49,13 @@ A link check catches missing files and anchors, not a link to the wrong existing
 
 **Found while wiring CI.** Claude Code loaded `agents/README.md` as an agent and `commands/README.md` as a command (`agentic-toolkit:README`, seen in a headless session's init event). `plugin.json` now lists `agents`, `commands`, and `outputStyles` explicitly (these keys replace the folder scan); `tests/plugin-manifest.test.sh` fails when a component file is not listed. `claude plugin details` reports `Agents (0)` under explicit lists, while a real session loads both agents, so don't use it to check this.
 
-## D4. Configurable docs paths for the docs check
+## D4. Configurable docs paths for the docs check — done
 
 **Problem.** The docs check treats every `.md` as documentation. In repos where markdown *is* the product (this one: skills, agents, commands), the docs check never fires, and doc paths outside `.md` (`.mdx`, `.rst`) are ignored.
 
-**Change.** Read doc pathspecs from `git config commitgate.docs` (space-separated, e.g. `docs/ README.md`); default stays `*.md`. Use the same pathspecs for "docs touched", "repo tracks docs", and the code-only hash exclusion. Set it for this repo.
+**Change.** As decided in [ADR 0004](../adr/0004-configurable-docs-paths.md): the gate reads doc pathspecs from a committed `.commit-gate-docs` at the repo root (one per line; default `*.md`). The original plan used `git config commitgate.docs`, which was rejected because `.git/config` is never committed, so clones and CI would silently get the default. The same pathspecs drive "docs touched", "repo tracks docs", and the code-only hash, through one `load_docs` function shared by stamping and checking. This repo's file lists `docs/`, `README.md`, and `*/README.md`.
 
-**ADR.** ADR 0003 is Accepted, so the trigger-rule change is a new ADR that supersedes 0003's docs-check rule (0003 marked `Superseded by <NNNN>`, per the adr-planning skill). ADR numbers here and in the [roadmap](roadmap.md) are assigned when the record is written, not reserved.
-
-**Acceptance.** In this repo, a skill-only change without a `docs/` edit raises the docs check; default behavior unchanged elsewhere (regression tests for both).
+**Acceptance.** In this repo, a skill-only change without a `docs/` edit raises the docs check; default behavior unchanged elsewhere (regression tests for both). Done 2026-10-22: 12 new cases in `tests/commit-gate.test.sh` (markdown-as-code, configured paths and single files, review-stamp survival, docs stamps, `*.rst`, comment-only fallback, no tracked docs, long-form magic, CRLF/comments/padding); 5 of them fail against the pre-D4 gate, and the earlier default-behavior cases still pass.
 
 ## D5. Hook prefilter
 

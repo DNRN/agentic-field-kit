@@ -18,7 +18,7 @@ Skip for changes with no observable surface: internal refactors with identical b
 ## Procedure
 
 1. **Summarize the change for a human.** From the diff, state what now behaves differently: renamed flags/commands/endpoints, new or removed features, changed defaults, new flows. No observable change → no doc change; say so.
-2. **Find affected docs.** Docs live where the project keeps them (`docs/`, `doc/`, `README*.md`, root `*.md` — follow the existing convention, never create a second one). Candidates:
+2. **Find affected docs.** Docs live where the project keeps them (`docs/`, `doc/`, `README*.md`, root `*.md` — follow the existing convention, never create a second one). A `.commit-gate-docs` file at the repo root, when present, lists the paths that count as docs (one git pathspec per line). Candidates:
    - Docs referencing changed files, paths, commands, flags, or symbols (grep the docs tree).
    - Docs describing the changed feature, even without naming it.
    - `README.md` claims about setup, usage, structure.
@@ -37,5 +37,6 @@ Skip for changes with no observable surface: internal refactors with identical b
 
 - Docs are for humans: what it does, how to use it, how it fits together — not a restatement of the code.
 - A commit that already edits docs passes the docs gate by design; the gate detects forgetting, the auditor detects inaccuracy.
+- What counts as docs: `*.md` by default; a repo where markdown is also code (skills, prompts) lists its real docs paths in `.commit-gate-docs`. Don't edit that file to make a pending check go away.
 - Never touch docs unrelated to the change; never reorganize the docs tree while syncing.
 - One pass, one report — don't leave half-updated docs because the diff was large; split by doc instead.

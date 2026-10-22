@@ -18,24 +18,52 @@
 #           is not stamped. Code-only hash: doc edits after a review do not
 #           invalidate it; any code change does. Doc-only diffs have no
 #           code-only hash, so each one is reviewed on its own.
-#   docs    pending when the diff changes code (non-.md) without touching
-#           any .md, the repo tracks at least one .md, and the code-diff hash
-#           is not stamped. A commit that edits docs is evidence docs were
-#           considered.
+#   docs    pending when the diff changes code without touching any doc, the
+#           repo tracks at least one doc, and the code-diff hash is not
+#           stamped. A commit that edits docs is evidence docs were considered.
+#
+# What counts as a doc: git pathspecs in .commit-gate-docs at the repository
+# root, one per line (`docs/`, `README.md`, `*.rst`, long-form magic such as
+# `:(glob)docs/**`); blank lines and `#` comments ignored. Without the file:
+# `*.md`. Everything else is code. See docs/adr/0004.
 #
 # Commit detection lives in parse-commit.py (chains, cd, git -C, git global
 # options, combined short flags, sh -c, heredocs).
 #
 # Design: fail-open. Any unexpected state (no stdin, no python3, not a repo,
 # parse error, git error) allows the commit. This is a nudge, not enforcement:
-# `--no-verify` always bypasses. See docs/adr/0002 and docs/adr/0003.
+# `--no-verify` always bypasses. See docs/adr/0002, 0003, and 0004.
 set -u
 
 SCRIPT_PATH="$0"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CODE_ONLY=(-- ':/' ':(top,exclude)*.md')
 
 hash_of() { { sha256sum 2>/dev/null || shasum -a 256; } | cut -d' ' -f1; }
+
+# load_docs <toplevel>: set DOCS (pathspecs that count as docs) and CODE_ONLY
+# (diff arguments excluding them) from <toplevel>/.commit-gate-docs. Stamping
+# and checking both call this, so their code-only hashes always agree.
+load_docs() {
+  local line
+  DOCS=()
+  if [ -f "$1/.commit-gate-docs" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      line="${line%$'\r'}"
+      line="${line#"${line%%[![:space:]]*}"}"
+      line="${line%"${line##*[![:space:]]}"}"
+      case "$line" in ''|'#'*) continue ;; esac
+      DOCS+=("$line")
+    done < "$1/.commit-gate-docs"
+  fi
+  [ "${#DOCS[@]}" -gt 0 ] || DOCS=('*.md')
+  CODE_ONLY=(-- .)
+  for line in "${DOCS[@]}"; do
+    case "$line" in
+      ':('*) CODE_ONLY+=(":(exclude,${line#:(}") ;;
+      *) CODE_ONLY+=(":(exclude)$line") ;;
+    esac
+  done
+}
 
 # diff_hashes <toplevel> <diff-kind>: print the full-diff hash, then the
 # code-only hash when the code-only diff is non-empty. An empty code-only diff
@@ -58,6 +86,7 @@ stamp_mode() { # $1=flag $2=stamp-name, remaining: [--all] [dir]
   [ $# -gt 0 ] && dir="$1"
   top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" || exit 0
   git_dir="$(git -C "$top" rev-parse --absolute-git-dir 2>/dev/null)" || exit 0
+  load_docs "$top"
   diff_hashes "$top" "$kind" > "$git_dir/$name"
   echo "stamped $flag in $git_dir/$name"
   exit 0
@@ -83,6 +112,7 @@ EOF
 
 top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" || exit 0
 git_dir="$(git -C "$top" rev-parse --absolute-git-dir 2>/dev/null)" || exit 0
+load_docs "$top"
 
 # Empty diff (allow-empty commits, merge continuations, nothing staged): allow.
 # Any git error (e.g. `commit -a` before the first commit): fail open.
@@ -95,7 +125,7 @@ EOF
 [ "${#full_hash}" -ge 8 ] || exit 0  # hash failed -> fail open
 
 docs_touched=no
-if [ -n "$(git -C "$top" diff "$diff_kind" --name-only -- ':/*.md' 2>/dev/null)" ]; then
+if [ -n "$(git -C "$top" diff "$diff_kind" --name-only -- "${DOCS[@]}" 2>/dev/null)" ]; then
   docs_touched=yes
 fi
 
@@ -110,7 +140,7 @@ fi
 # --- docs check -------------------------------------------------------------
 docs_pending=no
 if [ -n "$code_hash" ] && [ "$docs_touched" = no ]; then
-  if git -C "$top" ls-files 2>/dev/null | grep -q '\.md$'; then
+  if git -C "$top" ls-files -- "${DOCS[@]}" 2>/dev/null | grep -q .; then
     docs_pending=yes
     stamped doc-stamp "$code_hash" && docs_pending=no
   fi
