@@ -2,7 +2,7 @@
 
 Harness-agnostic collection of agent components: skills, subagents, commands, hooks, output styles, plus copy-paste rules, prompt templates, and permission policies. Works across projects and tools.
 
-Why this repo starts with an [ADR skill](docs/why-adrs.md): tests verify behavior; ADRs verify design — the missing half of most agent workflows.
+Why this repo starts with an [ADR skill](docs/why-adrs.md): tests verify behavior; ADRs verify design — the missing half of most agent workflows. Why the [code review mechanism](docs/why-code-review.md) is four layers: fresh eyes, right moment, ask instead of nag. Why [docs must be kept true](docs/why-docs-matters.md): agents believe stale docs.
 
 ## Compatibility
 
@@ -55,7 +55,9 @@ Symlinks stay live: `git pull` in this repo updates every harness at once. Per-p
 | [`rules/`](rules/) | `AGENTS.md` / `CLAUDE.md` templates | Copy into a project |
 | [`prompts/`](prompts/) | Plan / spec / review templates | Referenced by skills & commands |
 | [`policies/`](policies/) | Permission allow/deny presets | Copy into project settings |
-| [`evals/`](evals/) | Golden tasks per component | `claude plugin eval` |
+| [`evals/`](evals/) | Golden tasks per component (manual checklists; [conversion to `claude plugin eval`](docs/plans/design-improvements.md#d7-convert-evals-to-claude-plugin-eval-format) planned) | Run by hand |
+| [`tests/`](tests/) | Deterministic regression tests for hooks and `install.sh` | `tests/run.sh` |
+| [`docs/`](docs/) | Rationale essays, [ADRs](docs/adr/), [plans](docs/plans/) | Read |
 
 ## Conventions
 
@@ -63,7 +65,7 @@ Symlinks stay live: `git pull` in this repo updates every harness at once. Per-p
 - Skills: Agent Skills standard — frontmatter `name` must equal the folder name; keep frontmatter to `name` + `description` (+ optional `license`, `metadata`); the description is the discovery contract — write it as "use when …".
 - Every behavioral component ships with a matching eval or checklist under `evals/`.
 - No secrets, no machine-specific paths; scripts read relative to their component folder.
-- Validate before pushing: `./install.sh --check`, and `claude plugin validate .` if you touched `.claude-plugin/`.
+- Validate before pushing: `./install.sh --check`, `tests/run.sh`, and `claude plugin validate .` if you touched `.claude-plugin/`.
 
 ## Contributing
 
