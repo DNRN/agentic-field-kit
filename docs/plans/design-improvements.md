@@ -6,31 +6,31 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 
 | # | Item | Depends on | ADR |
 | --- | --- | --- | --- |
-| D1 | Accept ADRs 0001–0003 | — | status flip only |
-| D2 | Commit outstanding work | D1 | — |
+| D1 | ~~Accept ADRs 0001–0003~~ — done | — | status flip only |
+| D2 | ~~Commit outstanding work~~ — done | D1 | — |
 | D3 | CI pipeline | — | — |
-| D4 | Configurable docs paths for the docs check | D3 | amends 0003 |
+| D4 | Configurable docs paths for the docs check | D3 | supersedes 0003's trigger rule |
 | D5 | Hook prefilter for non-commit Bash calls | D3 | — |
 | D6 | Single-source review and audit rubrics | — | — |
 | D7 | Convert evals to `claude plugin eval` format | D6 | — |
 | D8 | Document and prevent duplicate skill loading | — | — |
 | D9 | Release hygiene: `.gitignore`, CHANGELOG, version tags | D3 | — |
 
-## D1. Accept ADRs 0001–0003
+## D1. Accept ADRs 0001–0003 — done
 
 **Problem.** All three ADRs are `Proposed` but already implemented; the repo's own adr-planning skill says implementation follows acceptance.
 
 **Change.** User confirms each decision; flip `Status` to `Accepted`. Anything the user rejects gets a superseding ADR instead.
 
-**Acceptance.** No implemented ADR is `Proposed`.
+**Acceptance.** No implemented ADR is `Proposed`. Done 2026-10-22: user accepted all three.
 
-## D2. Commit outstanding work
+## D2. Commit outstanding work — done
 
 **Problem.** Code review, doc-sync, hooks, ADRs, and docs are untracked.
 
 **Change.** Commit in logical units (ADR mechanism, code review, doc sync, gate fixes) through the commit gate itself — the first real dogfood run.
 
-**Acceptance.** `git status` clean; each commit passed or consciously waived the gate.
+**Acceptance.** `git status` clean; each commit passed or consciously waived the gate. Done 2026-10-22 (`0de25d1`…`ce917e1`); the gate did not run, since the committing session did not load the plugin.
 
 ## D3. CI pipeline
 
@@ -53,7 +53,7 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 
 **Change.** Read doc pathspecs from `git config commitgate.docs` (space-separated, e.g. `docs/ README.md`); default stays `*.md`. Use the same pathspecs for "docs touched", "repo tracks docs", and the code-only hash exclusion. Set it for this repo.
 
-**ADR.** Amends the trigger rule in ADR 0003 (edit while Proposed, else supersede).
+**ADR.** ADR 0003 is Accepted, so the trigger-rule change is a new ADR that supersedes 0003's docs-check rule (0003 marked `Superseded by <NNNN>`, per the adr-planning skill). ADR numbers here and in the [roadmap](roadmap.md) are assigned when the record is written, not reserved.
 
 **Acceptance.** In this repo, a skill-only change without a `docs/` edit raises the docs check; default behavior unchanged elsewhere (regression tests for both).
 

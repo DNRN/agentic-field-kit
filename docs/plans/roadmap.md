@@ -17,8 +17,8 @@ Phase 1 comes first because it turns rules the model must remember into determin
 
 | Component | Type | What it does | ADR |
 | --- | --- | --- | --- |
-| Portable commit gate | git `pre-commit` hook + installer | Same review/docs checks as `commit-gate.sh`, installed as a git hook, so the gate works in every harness (all agents run git); denial text reaches the agent via stderr; `--no-verify` keeps its git meaning | 0004 — revisits ADR 0002's "Claude Code only" consequence |
-| `adr-guard` | PreToolUse hook (Edit/Write) | Denies edits to an ADR whose status is `Accepted`, except the `Superseded by` status line | 0005 — turns a skill rule into enforcement |
+| Portable commit gate | git `pre-commit` hook + installer | Same review/docs checks as `commit-gate.sh`, installed as a git hook, so the gate works in every harness (all agents run git); denial text reaches the agent via stderr; `--no-verify` keeps its git meaning | new — supersedes ADR 0002's "Claude Code only" consequence |
+| `adr-guard` | PreToolUse hook (Edit/Write) | Denies edits to an ADR whose status is `Accepted`, except the `Superseded by` status line | new — turns a skill rule into enforcement |
 | `adr-index` | SessionStart hook | Injects Accepted ADR titles and paths (one line each) into context so every session knows the decisions exist | — |
 | `/ship` | command | Code review → doc sync → commit message → commit, in one explicit flow; reuses existing skills | — |
 | `/adr`, `/adr-accept` | commands | Create an ADR on demand; accept or supersede one with both records updated | — |
