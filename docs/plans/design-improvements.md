@@ -10,7 +10,7 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 | D2 | ~~Commit outstanding work~~ — done | D1 | — |
 | D3 | ~~CI pipeline~~ — done | — | — |
 | D4 | ~~Configurable docs paths for the docs check~~ — done | D3 | [0004](../adr/0004-configurable-docs-paths.md) supersedes 0003's trigger rule |
-| D5 | Hook prefilter for non-commit Bash calls | D3 | — |
+| D5 | ~~Hook prefilter for non-commit Bash calls~~ — done | D3 | — |
 | D6 | Single-source review and audit rubrics | — | — |
 | D7 | Convert evals to `claude plugin eval` format | D6 | — |
 | D8 | Document and prevent duplicate skill loading | — | — |
@@ -57,13 +57,13 @@ A link check catches missing files and anchors, not a link to the wrong existing
 
 **Acceptance.** In this repo, a skill-only change without a `docs/` edit raises the docs check; default behavior unchanged elsewhere (regression tests for both). Done 2026-10-22: 12 new cases in `tests/commit-gate.test.sh` (markdown-as-code, configured paths and single files, review-stamp survival, docs stamps, `*.rst`, comment-only fallback, no tracked docs, long-form magic, CRLF/comments/padding); 5 of them fail against the pre-D4 gate, and the earlier default-behavior cases still pass.
 
-## D5. Hook prefilter
+## D5. Hook prefilter — done
 
 **Problem.** The PreToolUse hook matches every Bash call and starts `python3` for each, including `ls`.
 
 **Change.** Before invoking the parser, `case "$input" in *commit*) ;; *) exit 0 ;; esac`.
 
-**Acceptance.** Non-commit Bash calls exit without spawning `python3`; gate tests still pass.
+**Acceptance.** Non-commit Bash calls exit without spawning `python3`; gate tests still pass. Done 2026-10-22: a `python3` shim in `tests/commit-gate.test.sh` counts launches (zero for a non-commit command; the test fails against the pre-D5 gate, and a commit command still launches it). A non-commit call dropped from about 25 ms to about 4 ms.
 
 ## D6. Single-source rubrics
 

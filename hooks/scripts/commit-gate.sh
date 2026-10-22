@@ -100,6 +100,9 @@ esac
 # --- gate mode --------------------------------------------------------------
 input="$(cat 2>/dev/null)" || exit 0
 [ -n "$input" ] || exit 0
+# The hook runs on every Bash call. A command that runs `git commit` contains
+# the word, so anything else exits here without spawning python3.
+case "$input" in *commit*) ;; *) exit 0 ;; esac
 # JSON and command parsing via python3 only (single code path). No python3 ->
 # the gate cannot run -> fail open; a missing parser must not wedge commits.
 command -v python3 >/dev/null 2>&1 || exit 0

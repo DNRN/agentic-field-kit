@@ -112,6 +112,22 @@ for payload in "" "not json" '{"tool_input":{}}'; do
   if [ -z "$out" ]; then echo "ok   malformed stdin '$payload' allowed"; else echo "FAIL malformed stdin '$payload'"; fails=$((fails + 1)); fi
 done
 
+echo "# non-commit calls skip the parser"
+# A python3 shim on PATH records each launch, then runs the real interpreter.
+SHIM="$WORK/shim"; mkdir -p "$SHIM"
+printf '#!/bin/sh\necho launched >> "%s/launches"\nexec %s "$@"\n' "$SHIM" "$(command -v python3)" > "$SHIM/python3"
+chmod +x "$SHIM/python3"
+launches() { # $1=command -> number of python3 launches during one gate run
+  rm -f "$SHIM/launches"
+  python3 -c 'import json,sys; print(json.dumps({"tool_input":{"command":sys.argv[1]},"cwd":sys.argv[2]}))' "$1" "$REPO" |
+    env -i PATH="$SHIM:/usr/bin:/bin" bash "$GATE" >/dev/null
+  if [ -f "$SHIM/launches" ]; then wc -l < "$SHIM/launches" | tr -d ' '; else echo 0; fi
+}
+n="$(launches "ls -la && git status")"
+if [ "$n" -eq 0 ]; then echo "ok   non-commit command never launches python3"; else echo "FAIL non-commit command launched python3 $n time(s)"; fails=$((fails + 1)); fi
+n="$(launches "git commit -m x")"
+if [ "$n" -gt 0 ]; then echo "ok   commit command does launch python3 (shim is effective)"; else echo "FAIL shim saw no launch for a commit"; fails=$((fails + 1)); fi
+
 echo "# docs check"
 new_repo; stage code.py
 expect_reason "documentation (" "code without docs raises the docs check" "git commit -m x"
