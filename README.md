@@ -2,6 +2,8 @@
 
 Harness-agnostic collection of agent components: skills, subagents, commands, hooks, output styles, plus copy-paste rules, prompt templates, and permission policies. Works across projects and tools.
 
+Why this repo starts with an [ADR skill](docs/why-adrs.md): tests verify behavior; ADRs verify design — the missing half of most agent workflows.
+
 ## Compatibility
 
 | Component | Claude Code | Codex | Gemini CLI | OpenCode | Cursor | omp |
