@@ -4,7 +4,7 @@ Date: 2026-10-22
 
 ## Status
 
-Accepted
+Accepted. Decision item 4's docs-check trigger rule (what counts as docs) superseded by [0004](0004-configurable-docs-paths.md).
 
 ## Context
 
