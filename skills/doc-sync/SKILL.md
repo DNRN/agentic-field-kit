@@ -17,26 +17,28 @@ Skip for changes with no observable surface: internal refactors with identical b
 
 ## Procedure
 
-1. **Summarize the change for a human.** From the diff, state what now behaves differently: renamed flags/commands/endpoints, new or removed features, changed defaults, new flows. No observable change → no doc change; say so.
-2. **Find affected docs.** Docs live where the project keeps them (`docs/`, `doc/`, `README*.md`, root `*.md` — follow the existing convention, never create a second one). A `.commit-gate-docs` file at the repo root, when present, lists the paths that count as docs (one git pathspec per line). Candidates:
+The documentation standards (audience, surgical edits, diagrams, ADR correlation), the audit checklist, severities, and the report format live in [`references/rubric.md`](references/rubric.md), the single source shared with every auditor subagent.
+
+1. **Fix the scope and summarize the change for a human.** Scope from the target the user or gate named: none / `staged` → `git diff --cached`; `worktree` → `git diff HEAD`; a branch → `git diff $(git merge-base <branch> <default-branch>)..HEAD`; a ref range → `git diff <ref>..<ref>`. From that diff, state what now behaves differently: renamed flags/commands/endpoints, new or removed features, changed defaults, new flows. No observable change → no doc change; say so.
+2. **Find affected docs.** Docs live where the project keeps them (`docs/`, `doc/`, `README*.md`, root `*.md`): follow the existing convention, never create a second one. A `.commit-gate-docs` file at the repo root, when present, lists the paths that count as docs (one git pathspec per line). Candidates:
    - Docs referencing changed files, paths, commands, flags, or symbols (grep the docs tree).
    - Docs describing the changed feature, even without naming it.
    - `README.md` claims about setup, usage, structure.
-3. **Get fresh eyes.** If the harness supports subagents, delegate to the doc-auditor (`agents/doc-auditor.md`) with the diff and candidate docs — it reports drift and proposes replacements; the author applies them. Without subagents: audit each candidate yourself against the diff, claim by claim.
-4. **Update surgically.** Edit the stale passages; never regenerate whole files. Delete docs for removed features. Add docs for new user-visible features in the project's existing voice and structure; if the project has no docs yet, start `docs/` with a short index that links the README.
-5. **Diagrams.** A feature with flow, sequence, state, or dependency structure gets exactly one mermaid diagram embedded in its doc, drawn from the actual code paths. Update the diagram when the structure changes; delete it when the structure collapses. No decorative diagrams, no second diagram of the same concept. Validate syntax if `mmdc` is available; keep diagrams simple enough to verify by reading.
-6. **Correlate with ADRs.** Find the project's ADR home (`docs/adr/` or the convention in use).
-   - A doc making an architectural claim links the governing ADR.
-   - Never describe a superseded design as current — update the prose and link the superseding ADR.
-   - The change implements or contradicts an Accepted ADR → surface it; a genuine direction change goes through the adr-planning skill first, then the docs.
-   - A new architectural decision appeared during doc writing → stop, adr-planning skill, then continue.
-7. **Report** per doc: updated / created / deleted / unchanged (and why). Apply the edits — doc-sync's output is applied documentation, not just findings.
-8. **Unblock the commit.** If the commit gate denied with "documentation" pending, stamp with the command from its denial message (`commit-gate.sh --stamp-docs`). Only the user can waive the check — if they declined, commit with `--no-verify`. Never stamp a code diff whose docs were not actually checked.
+3. **Get fresh eyes.** Whenever the harness can spawn subagents, delegate, even for a small diff: the author already believes the docs are fine. Use the bundled `doc-auditor` agent where the harness loads this toolkit's agents; otherwise any read-only subagent. Pass exactly four things:
+   - the diff command,
+   - the repository path,
+   - the candidate doc list,
+   - this skill's `references/rubric.md`, in a form the subagent can read (an absolute path, or a harness URI such as `skill://doc-sync/references/rubric.md`), with the instruction to audit as the rubric describes.
+
+   Never pass your reasoning. Only without subagents: audit each candidate yourself against the rubric, claim by claim.
+4. **Apply** the accepted proposals, and write any new docs, to the rubric's standards. If the project has no docs yet, start `docs/` with a short index that links the README.
+5. **Check ADRs.** The change implements or contradicts an Accepted ADR → surface it; a genuine direction change goes through the adr-planning skill first, then the docs. A new architectural decision appeared while writing docs → stop, run the adr-planning skill, then continue.
+6. **Report** per doc: updated / created / deleted / unchanged (and why), then offer to commit. doc-sync's output is applied documentation, not just findings.
+7. **Unblock the commit.** If the commit gate denied with "documentation" pending, stamp with the command from its denial message (`commit-gate.sh --stamp-docs`). Only the user can waive the check: if they declined, commit with `--no-verify`. Never stamp a code diff whose docs were not actually checked.
 
 ## Gotchas
 
-- Docs are for humans: what it does, how to use it, how it fits together — not a restatement of the code.
-- A commit that already edits docs passes the docs gate by design; the gate detects forgetting, the auditor detects inaccuracy.
+- A commit that already edits docs passes the docs gate by design; the gate detects forgetting, the audit detects inaccuracy.
 - What counts as docs: `*.md` by default; a repo where markdown is also code (skills, prompts) lists its real docs paths in `.commit-gate-docs`. Don't edit that file to make a pending check go away.
 - Never touch docs unrelated to the change; never reorganize the docs tree while syncing.
-- One pass, one report — don't leave half-updated docs because the diff was large; split by doc instead.
+- One pass, one report: don't leave half-updated docs because the diff was large; split by doc instead.

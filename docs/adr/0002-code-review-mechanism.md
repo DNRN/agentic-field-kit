@@ -4,7 +4,7 @@ Date: 2026-10-22
 
 ## Status
 
-Accepted
+Accepted. Decision item 2's subagent input contract and item 3 (the command layer) superseded by [0005](0005-rubrics-live-in-skills.md).
 
 ## Context
 

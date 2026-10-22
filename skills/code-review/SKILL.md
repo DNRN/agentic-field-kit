@@ -17,28 +17,24 @@ Skip for whitespace/formatting-only diffs, lockfiles, and generated/vendored fil
 
 ## Procedure
 
-1. **Fix the scope.** Default: staged diff (`git diff --cached`); for `git commit -a`, the worktree diff (`git diff HEAD`). Otherwise branch vs its base (`git merge-base <base> HEAD`), or the ref the user named. State the scope in the report; exclude vendored and generated paths.
-2. **Get fresh eyes.** If the harness supports subagents, delegate to a reviewer subagent (`agents/code-reviewer.md` where bundled), passing only the diff command and repo path — never your reasoning about the change. Without subagents: re-read every changed hunk from the diff itself before evaluating it, deliberately checking it against (not through) your intent.
-3. **Evaluate each changed hunk:**
-   - Correctness: edge cases, error paths, off-by-one/boundaries, empty/nil states, concurrency.
-   - Security: injection, secrets, authorization on new endpoints, unsafe deserialization, path traversal.
-   - Tests: does a test exercise the changed behavior and fail on its regression? Changed behavior without a covering test is a finding.
-   - Contracts: public API/schema/config changes — are all callers updated?
-   - Dead weight: unreachable code, scope creep beyond the stated task, code made obsolete by the change.
-   - Consistency: project conventions and Accepted ADRs (`docs/adr/`) — contradicting an Accepted ADR is a finding.
-4. **Verify every finding against the actual source** before reporting: cite `file:line`, quote the offending line, state the concrete failure mode. No failure mode, no finding — style preference is not a finding unless it masks a bug.
-5. **Report:**
+How to review, what counts as a finding, severities, and the report format all live in [`references/rubric.md`](references/rubric.md), the single source shared with every reviewer subagent.
 
-   | Severity | Location | Finding | Fix |
-   | --- | --- | --- | --- |
+1. **Fix the scope.** From the target the user or gate named, or the default:
+   - none / `staged` → `git diff --cached`
+   - `worktree` (the gate's scope for `git commit -a`) → `git diff HEAD`
+   - a branch → `git diff $(git merge-base <branch> <default-branch>)..HEAD` (default branch from `git remote show origin` or the repo's layout)
+   - a ref range → `git diff <ref>..<ref>`
+2. **Get fresh eyes.** If the harness can spawn subagents, delegate. Use the bundled `code-reviewer` agent where the harness loads this toolkit's agents; otherwise any read-only subagent. Pass exactly three things:
+   - the diff command,
+   - the repository path,
+   - this skill's `references/rubric.md`, in a form the subagent can read (an absolute path, or a harness URI such as `skill://code-review/references/rubric.md`), with the instruction to review as the rubric describes.
 
-   Severity: `blocker` = must fix before commit; `major` = fix or explicit user waiver; `minor` = follow-up. End with a verdict: **approve** or **fix then commit**.
-6. **Resolve.** Fix blockers and majors, then re-review the hunks the fixes touched. Findings are reported, not silently rewritten — the author applies fixes; the reviewer stays read-only.
-7. **Unblock the commit.** If the commit-gate hook denied the commit, stamp the reviewed diff by running the stamp command named in the hook's denial message (`commit-gate.sh --stamp-review`). Only the user can waive review — if they declined, commit with `--no-verify` instead. Never stamp a diff that was not reviewed.
+   Never pass your reasoning about the change. Without subagents: apply the rubric yourself, re-reading every hunk from the diff and checking it against (not through) your intent.
+3. **Report** the reviewer's findings table and verdict verbatim. After **approve**, offer to commit.
+4. **Resolve** after **fix then commit**: fix blockers and majors, then re-review the hunks the fixes touched. The author applies fixes; the reviewer stays read-only.
+5. **Unblock the commit.** If the commit-gate hook denied the commit, stamp the reviewed diff by running the stamp command named in the hook's denial message (`commit-gate.sh --stamp-review`). Only the user can waive review: if they declined, commit with `--no-verify` instead. Never stamp a diff that was not reviewed.
 
 ## Gotchas
 
-- Never review from memory of writing the code — only from the diff.
-- Diff over ~2000 lines: review in file-group passes, one report per pass.
-- The stamp records a diff hash, not permanent approval — any new staged change re-triggers the gate. That is by design.
+- The stamp records a diff hash, not permanent approval: any new staged change re-triggers the gate. That is by design.
 - The gate is a nudge, not enforcement (`--no-verify` exists). Do not bypass it silently.

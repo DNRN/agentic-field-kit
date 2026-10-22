@@ -9,6 +9,6 @@
   "license": "MIT",
   "keywords": ["agents", "skills", "commands", "hooks", "rules", "templates"],
   "agents": ["./agents/code-reviewer.md", "./agents/doc-auditor.md"],
-  "commands": ["./commands/code-review.md", "./commands/doc-sync.md"],
+  "commands": [],
   "outputStyles": []
 }

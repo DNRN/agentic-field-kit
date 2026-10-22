@@ -1,9 +1,9 @@
 # Why code review is a gate, not a habit
 
-The mechanism in this repo is four cooperating parts: a [skill](../skills/code-review/SKILL.md) that holds the review procedure, a [reviewer subagent](../agents/code-reviewer.md) with fresh eyes, a [slash command](../commands/code-review.md) for you, and a [hook](../hooks/) that asks before an unreviewed commit. Why it is shaped that way:
+The mechanism in this repo is three cooperating parts: a [skill](../skills/code-review/SKILL.md) that holds the review procedure and is also your entry point, a [reviewer subagent](../agents/code-reviewer.md) with fresh eyes, and a [hook](../hooks/) that asks before an unreviewed commit. The review [rubric](../skills/code-review/references/rubric.md) lives once, inside the skill, so every harness and every reviewer applies the same one ([ADR 0005](adr/0005-rubrics-live-in-skills.md)). Why it is shaped that way:
 
 **1. The context that wrote the code cannot review it.**
-An agent that just spent twenty turns building something holds two handicaps: it already believes the code is correct, and it "remembers" intent the diff doesn't show. Ask it to review and you get a summary of its own reasoning. That's why the reviewer is a separate subagent — fresh context, read-only tools, fed the diff and nothing else. The same applies to you reviewing an LLM's 900-line diff: what you need is a first-pass filter, not a second author.
+An agent that just spent twenty turns building something holds two handicaps: it already believes the code is correct, and it "remembers" intent the diff doesn't show. Ask it to review and you get a summary of its own reasoning. That's why the reviewer is a separate subagent — fresh context, read-only tools, fed the diff and the rubric, never the author's reasoning. The same applies to you reviewing an LLM's 900-line diff: what you need is a first-pass filter, not a second author.
 
 **2. Review deferred is review skipped.**
 "I'll review it later" loses to chat momentum every time — the next task starts, the branch ships, the review never happens. The only reliable moment to ask is the commit boundary: work is declared done, the diff is stable, and fixes are still one command away. A minute after you push, the fix is a PR comment. A week later it's an incident.
@@ -17,13 +17,13 @@ Auto-reviewing every change burns attention on trivia; a hard block gets disable
 **5. The reviewer reports; it never fixes.**
 A reviewer with edit rights reviews its own edits — the loop closes and the judgment disappears. Here the reviewer is read-only by construction: it returns severity-ranked findings with `file:line` and a verdict. The author applies fixes, and the touched hunks get re-reviewed. Findings without a failure mode are forbidden, which keeps the report signal instead of style noise.
 
-The pattern underneath: agentic coding makes writing cheap and review the bottleneck. A review mechanism only works if it fires at the right moment, with fresh eyes, and asks instead of nagging. All four parts exist to guarantee those three properties.
+The pattern underneath: agentic coding makes writing cheap and review the bottleneck. A review mechanism only works if it fires at the right moment, with fresh eyes, and asks instead of nagging. All three parts exist to guarantee those three properties.
 
 ---
 
 ## Using it
 
-**What loads where.** The skill works in every harness (`./install.sh` symlinks it everywhere skills are read). The subagent, command, and commit gate load via the Claude Code plugin:
+**What loads where.** The skill and its rubric work in every harness (`./install.sh` symlinks them everywhere skills are read); where a harness has subagents but not this toolkit's agents, any read-only subagent given the rubric does the same job. The bundled subagent and the commit gate load via the Claude Code plugin:
 
 ```
 /plugin marketplace add DNRN/agentic-toolkit
@@ -32,7 +32,7 @@ The pattern underneath: agentic coding makes writing cheap and review the bottle
 
 **Three ways a review starts:**
 
-1. You ask: `/agentic-toolkit:code-review` (optionally a target — `staged`, a branch, a ref range; defaults to the staged diff).
+1. You ask: invoke the skill (`/agentic-toolkit:code-review` in Claude Code, your harness's skill invocation elsewhere), optionally with a target: `staged`, `worktree`, a branch, a ref range; defaults to the staged diff.
 2. The agent offers: per the skill, before committing completed work it proposes a review first.
 3. The gate asks: an unreviewed `git commit` is denied with instructions for the agent to ask you.
 

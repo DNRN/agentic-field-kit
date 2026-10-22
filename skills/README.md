@@ -23,6 +23,7 @@ skills/<kebab-name>/
 
 - One skill per folder, self-contained, no dependencies on other skills.
 - Body = procedure: when to use, steps, gotchas. Not prose documentation.
+- Content a subagent also applies (a review rubric, an audit checklist) lives once in `references/`; the skill passes its location when delegating. See `code-review/references/rubric.md` and [ADR 0005](../docs/adr/0005-rubrics-live-in-skills.md).
 - Slash-command-like behavior across tools: set explicit-invocation metadata (`metadata: {opencode/slash: "true"}`, Cursor's `disable-model-invocation: true`, Codex's `allow_implicit_invocation: false`) rather than a separate per-tool command file.
 
 ## Distribution

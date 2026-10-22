@@ -1,6 +1,6 @@
 # code-review - golden tasks
 
-Covers `skills/code-review/`, `agents/code-reviewer.md`, `commands/code-review.md`.
+Covers `skills/code-review/` (procedure and `references/rubric.md`) and `agents/code-reviewer.md`. Every task also checks that the reviewer read `references/rubric.md` before reviewing.
 
 ## Task 1: seeded bugs are found and cited
 

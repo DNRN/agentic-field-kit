@@ -4,7 +4,7 @@ Date: 2026-10-22
 
 ## Status
 
-Accepted. Decision item 4's docs-check trigger rule (what counts as docs) superseded by [0004](0004-configurable-docs-paths.md).
+Accepted. Decision item 4's docs-check trigger rule (what counts as docs) superseded by [0004](0004-configurable-docs-paths.md); item 2's subagent input contract and item 3 (the command layer) superseded by [0005](0005-rubrics-live-in-skills.md).
 
 ## Context
 

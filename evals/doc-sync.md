@@ -1,6 +1,6 @@
 # doc-sync - golden tasks
 
-Covers `skills/doc-sync/`, `agents/doc-auditor.md`, `commands/doc-sync.md`.
+Covers `skills/doc-sync/` (procedure and `references/rubric.md`) and `agents/doc-auditor.md`. Every task also checks that the auditor read `references/rubric.md` before auditing.
 
 ## Task 1: renamed flag is updated in docs
 

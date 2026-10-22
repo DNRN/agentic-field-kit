@@ -11,11 +11,11 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 | D3 | ~~CI pipeline~~ — done | — | — |
 | D4 | ~~Configurable docs paths for the docs check~~ — done | D3 | [0004](../adr/0004-configurable-docs-paths.md) supersedes 0003's trigger rule |
 | D5 | ~~Hook prefilter for non-commit Bash calls~~ — done | D3 | — |
-| D6 | Single-source review and audit rubrics | — | — |
+| D6 | ~~Single-source review and audit rubrics~~ — done | — | [0005](../adr/0005-rubrics-live-in-skills.md) |
 | D7 | Convert evals to `claude plugin eval` format | D6 | — |
 | D8 | Document and prevent duplicate skill loading | — | — |
 | D9 | Release hygiene: `.gitignore`, CHANGELOG, version tags | D3 | — |
-| D10 | Resolve `code-review` / `doc-sync` skill-command name collisions | — | — |
+| D10 | ~~Resolve `code-review` / `doc-sync` skill-command name collisions~~ — done (with D6) | — | [0005](../adr/0005-rubrics-live-in-skills.md) |
 
 ## D1. Accept ADRs 0001–0003 — done
 
@@ -65,13 +65,23 @@ A link check catches missing files and anchors, not a link to the wrong existing
 
 **Acceptance.** Non-commit Bash calls exit without spawning `python3`; gate tests still pass. Done 2026-10-22: a `python3` shim in `tests/commit-gate.test.sh` counts launches (zero for a non-commit command; the test fails against the pre-D5 gate, and a commit command still launches it). A non-commit call dropped from about 25 ms to about 4 ms.
 
-## D6. Single-source rubrics
+## D6. Single-source rubrics — done
 
 **Problem.** The review checklist exists twice (`skills/code-review/SKILL.md`, `agents/code-reviewer.md`), as does the doc audit rubric (`skills/doc-sync/SKILL.md`, `agents/doc-auditor.md`). They will drift.
 
-**Change.** Move each rubric to `skills/<skill>/references/rubric.md`; the skill links it; the agent reads it. First verify whether Claude Code subagent frontmatter can preload a skill; otherwise the agent prompt names the plugin-relative path.
+**Constraint added by the user.** The single copy must stay harness-agnostic: Claude Code, Codex, omp, and the rest.
 
-**Acceptance.** Each rubric has exactly one copy; code-review and doc-sync evals still pass.
+**Change.** As decided in [ADR 0005](../adr/0005-rubrics-live-in-skills.md): each rubric lives once in `skills/<skill>/references/rubric.md`, the only location every harness installs. Skills keep the procedure and pass the rubric's location to whichever read-only subagent reviews; `agents/*.md` are thin wrappers that read the rubric they are given. The planned Claude Code `skills:` preload was rejected: it is Claude-only and injects `SKILL.md`, not the rubric.
+
+**Acceptance.** Each rubric has exactly one copy; code-review and doc-sync evals still pass. Done 2026-10-22, observed in real runs on scratch repos with seeded defects:
+
+- **omp**, generic `reviewer` subagent given only the rubric path: followed the rubric format exactly; found the off-by-one, the SQL injection, and the missing test.
+- **Claude Code**, `/agentic-toolkit:code-review`: skill loaded, main agent passed the rubric's absolute path to `agentic-toolkit:code-reviewer`, which read the rubric first; same findings, rubric format.
+- **Claude Code**, `/agentic-toolkit:doc-sync`: stale `--old` flag in `docs/guide.md` fixed surgically. With the auditor requested, `agentic-toolkit:doc-auditor` read the rubric first. Without the request, the main agent twice audited by itself, citing a Claude Code instruction not to spawn agents unasked; recorded in ADR 0005's consequences.
+
+## D10. Skill-command name collisions — done (with D6)
+
+Confirmed in a real session: loading `agentic-toolkit:code-review` from inside the command re-invoked the command, and a bare `code-review` loaded Claude Code's built-in skill. The commands were removed; the skills are the entry points (`/agentic-toolkit:code-review` still works, now naming the skill). The init event now lists each `agentic-toolkit:` skill, slash command, and agent once. See [ADR 0005](../adr/0005-rubrics-live-in-skills.md).
 
 ## D7. Convert evals to `claude plugin eval` format
 
@@ -87,6 +97,8 @@ A link check catches missing files and anchors, not a link to the wrong existing
 
 **Change.** Verify per harness; document the recommended install set (plugin users: `--harness agents --harness omp`); change the default only if duplicates cause real conflicts.
 
+**Evidence so far (Claude Code, 2026-10-22).** With `~/.claude/skills/adr-planning` linked by an earlier `./install.sh` and the plugin loaded, the session lists only the bare `adr-planning`; the plugin's `agentic-toolkit:adr-planning` does not appear. Risk to check: a user-level `code-review` link would share its bare name with Claude Code's built-in `code-review` skill, which wins a bare-name lookup in plugin sessions (observed during D6).
+
 **Acceptance.** README states one recommended install per setup, backed by a checked observation per harness.
 
 ## D9. Release hygiene
@@ -94,14 +106,6 @@ A link check catches missing files and anchors, not a link to the wrong existing
 **Change.** `.gitignore` (`evals/results/`), `CHANGELOG.md` (Keep a Changelog), bump `plugin.json` version per release, tag with `claude plugin tag`.
 
 **Acceptance.** Each release has a changelog entry, a version bump, and a tag.
-
-## D10. Skill-command name collisions
-
-**Problem.** `skills/code-review` and `commands/code-review.md` both register as `agentic-toolkit:code-review`, and the same goes for doc-sync. A headless session lists one `agentic-toolkit:code-review` slash command, so one definition shadows the other. Which one wins, and whether the skill's auto-trigger still fires, is unverified.
-
-**Change.** Check precedence. Then either rename the commands (e.g. `/agentic-toolkit:review`) or drop them in favor of the skills with explicit-invocation metadata, following `commands/README.md`'s own advice. Update ADRs 0002/0003 if the four-layer structure changes.
-
-**Acceptance.** Every component name is unique in a session's init event; the review and doc-sync flows still start from both the user command and the skill trigger.
 
 ## Done
 
