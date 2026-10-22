@@ -36,7 +36,7 @@ Symlinks stay live: `git pull` in this repo updates every harness at once. Per-p
 ## Claude Code full bundle (also loads agents, commands, hooks, styles)
 
 ```
-/plugin marketplace add dnrn/agentic-toolkit
+/plugin marketplace add DNRN/agentic-toolkit
 /plugin install agentic-toolkit@agentic-toolkit
 ```
 
