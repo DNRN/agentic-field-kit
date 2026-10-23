@@ -14,7 +14,7 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 | D6 | ~~Single-source review and audit rubrics~~ — done | — | [0005](../adr/0005-rubrics-live-in-skills.md) |
 | D7 | ~~Convert evals to `claude plugin eval` format~~ — done | D6 | — |
 | D8 | ~~Document and prevent duplicate skill loading~~ — done | — | — |
-| D9 | Release hygiene: `.gitignore`, CHANGELOG, version tags | D3 | — |
+| D9 | ~~Release hygiene: `.gitignore`, CHANGELOG, version tags~~ — done | D3 | — |
 | D10 | ~~Resolve `code-review` / `doc-sync` skill-command name collisions~~ — done (with D6) | — | [0005](../adr/0005-rubrics-live-in-skills.md) |
 | D11 | Commit gate ignores formatting-only diffs | D7 | — |
 
@@ -117,11 +117,11 @@ The Claude Code row is a real conflict: the old default hid every plugin skill, 
 
 **Acceptance.** README states one recommended install per setup, backed by a checked observation per harness. Done 2026-10-23; Cursor is the one harness checked from docs and code instead of a run.
 
-## D9. Release hygiene
+## D9. Release hygiene — done
 
 **Change.** `.gitignore` (`evals/results/`), `CHANGELOG.md` (Keep a Changelog), bump `plugin.json` version per release, tag with `claude plugin tag`.
 
-**Acceptance.** Each release has a changelog entry, a version bump, and a tag.
+**Acceptance.** Each release has a changelog entry, a version bump, and a tag. Done 2026-10-23: the release steps are in the README's [Releasing](../../README.md#releasing) section; `tests/release.test.sh` fails when `plugin.json`'s version has no dated changelog entry or the `Unreleased` section is missing. First release `0.1.0`, tagged `agentic-toolkit--v0.1.0`.
 
 ## D11. Commit gate ignores formatting-only diffs
 

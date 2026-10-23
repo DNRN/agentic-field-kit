@@ -78,6 +78,15 @@ Symlinks stay live: `git pull` in this repo updates every harness at once. Per-p
 - Agents, commands, and output styles are registered explicitly in `.claude-plugin/plugin.json` (the folder scan would also load each folder's README); `tests/run.sh` fails on an unregistered file.
 - Validate before pushing: `./install.sh --check`, `tests/run.sh`, and `claude plugin validate .` if you touched `.claude-plugin/`. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these plus shellcheck, an internal link and anchor check, and mermaid rendering on every push to `main` and every PR. CI does not run the [eval suite](evals/README.md) (it needs model credentials and costs money): run it when a skill, agent, or hook changes.
 
+## Releasing
+
+Users of the plugin get a new release only when `version` in `.claude-plugin/plugin.json` changes; with an unchanged version, `claude plugin update` reports the plugin as current.
+
+1. Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a new `## [X.Y.Z] - YYYY-MM-DD` heading and add its compare link at the bottom.
+2. Set the same `X.Y.Z` in `.claude-plugin/plugin.json` (semver: minor for new components or behavior, patch for fixes; a breaking rename or removal is a major once past 1.0).
+3. `tests/run.sh` (fails if the version has no dated changelog entry), then commit.
+4. `claude plugin tag --push` creates and pushes `agentic-toolkit--vX.Y.Z` after checking that `plugin.json` and the marketplace entry agree.
+
 ## Contributing
 
 PR per component. Self-contained, follows the conventions above, includes an eval. MIT.
