@@ -13,7 +13,7 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 | D5 | ~~Hook prefilter for non-commit Bash calls~~ — done | D3 | — |
 | D6 | ~~Single-source review and audit rubrics~~ — done | — | [0005](../adr/0005-rubrics-live-in-skills.md) |
 | D7 | Convert evals to `claude plugin eval` format | D6 | — |
-| D8 | Document and prevent duplicate skill loading | — | — |
+| D8 | ~~Document and prevent duplicate skill loading~~ — done | — | — |
 | D9 | Release hygiene: `.gitignore`, CHANGELOG, version tags | D3 | — |
 | D10 | ~~Resolve `code-review` / `doc-sync` skill-command name collisions~~ — done (with D6) | — | [0005](../adr/0005-rubrics-live-in-skills.md) |
 
@@ -91,15 +91,28 @@ Confirmed in a real session: loading `agentic-toolkit:code-review` from inside t
 
 **Acceptance.** `claude plugin eval . --trust-plugin` runs every golden task with a with/without-plugin comparison; README and `evals/README.md` updated to say so.
 
-## D8. Duplicate skill loading
+## D8. Duplicate skill loading — done
 
-**Problem.** Default `./install.sh` links into `~/.agents/skills` and `~/.claude/skills`; Cursor and OpenCode read both, and Claude Code plugin users also get `skills/` from the plugin. Effect of duplicates per harness is unverified.
+**Problem.** Default `./install.sh` linked into `~/.agents/skills`, `~/.claude/skills`, and `~/.omp/agent/skills`; several harnesses read more than one of these, and Claude Code plugin users also get `skills/` from the plugin. Effect of duplicates per harness was unverified.
 
-**Change.** Verify per harness; document the recommended install set (plugin users: `--harness agents --harness omp`); change the default only if duplicates cause real conflicts.
+**Change.** Verify per harness; document the recommended install set; change the default only if duplicates cause real conflicts.
 
-**Evidence so far (Claude Code, 2026-10-22).** With `~/.claude/skills/adr-planning` linked by an earlier `./install.sh` and the plugin loaded, the session lists only the bare `adr-planning`; the plugin's `agentic-toolkit:adr-planning` does not appear. Risk to check: a user-level `code-review` link would share its bare name with Claude Code's built-in `code-review` skill, which wins a bare-name lookup in plugin sessions (observed during D6).
+**Observed 2026-10-23**, each harness under an isolated `HOME`, two same-named skills with different content placed in two directories it reads:
 
-**Acceptance.** README states one recommended install per setup, backed by a checked observation per harness.
+| Harness | Reads | Same skill in two places |
+| --- | --- | --- |
+| Claude Code 2.1.288 (`system/init` skill list) | `~/.claude/skills`, not `~/.agents/skills` | Personal + plugin, identical content (symlink or marketplace copy): the plugin's `agentic-toolkit:<skill>` disappears; `/agentic-toolkit:code-review` then answers "isn't installed in this session". Different content: both load. A personal `code-review` replaces the built-in `/code-review` |
+| omp 18.12.5 (`skill://` listing) | `~/.omp/agent/skills` and `~/.agents/skills` | Same folder or identical copies: listed once. Different content: the `~/.omp` copy keeps the name, the other becomes `agents/<name>` |
+| Codex 0.164.0 (app-server `skills/list`) | `~/.agents/skills`, `~/.codex/skills` | Listed twice unless both resolve to the same folder. A symlink into this repo is named `agentic-toolkit:<name>` (real path under `.claude-plugin/`); a copy keeps the bare name |
+| Gemini CLI 0.65.0 (`gemini skills list`) | `~/.agents/skills`, `~/.gemini/skills` | Listed once, `~/.agents` wins, "Skill conflict detected" on stderr |
+| OpenCode 1.19.4 (`opencode debug skill`) | `~/.agents/skills`, `~/.claude/skills`, `~/.config/opencode/skills` | Listed once, last directory scanned wins, "duplicate skill name" in the log only |
+| Cursor Agent CLI 2026.10.22 | `~/.agents/skills`, `~/.cursor/skills`; `~/.claude/skills` only with third-party extensibility on | Not run: every listing command needs a login. From [its docs](https://cursor.com/docs/skills) and the CLI's bundled code, listed once |
+
+The Claude Code row is a real conflict: the old default hid every plugin skill, including the `/agentic-toolkit:code-review` and `/agentic-toolkit:doc-sync` that `commit-gate.sh`'s denial tells the agent to run. It also contradicts Claude Code's docs, which say plugin skills always load alongside personal ones. Everything else is harmless.
+
+**Result.** `./install.sh` now installs into `~/.agents/skills` only, which covers Codex, Gemini CLI, OpenCode, Cursor, and omp and cannot shadow the plugin. `--remove` still defaults to every target, so links made by the old default go too. README lists one install per setup; `tests/install.test.sh` fails if the default touches `~/.claude/skills`.
+
+**Acceptance.** README states one recommended install per setup, backed by a checked observation per harness. Done 2026-10-23; Cursor is the one harness checked from docs and code instead of a run.
 
 ## D9. Release hygiene
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Regression tests for install.sh: it must never replace or remove anything it
-# did not install.
+# did not install, and its default target must not shadow the Claude Code
+# plugin's skills (~/.claude/skills does; see README "Install skills").
 set -u
 INSTALL="$(cd "$(dirname "$0")/.." && pwd)/install.sh"
 HOME="$(mktemp -d)"
@@ -40,6 +41,14 @@ install --mode copy
 check "copy: replaces its own symlink" [ ! -L "$SKILLS/code-review" ]
 "$INSTALL" --harness claude --remove >/dev/null
 check "remove: own installs removed" [ ! -e "$SKILLS/code-review" ]
+
+"$INSTALL" >/dev/null
+check "default: installs into ~/.agents/skills" [ -L "$HOME/.agents/skills/code-review" ]
+check "default: leaves ~/.claude/skills alone (would shadow the plugin)" [ ! -e "$SKILLS/code-review" ]
+install --mode symlink   # an install made by the old all-targets default
+"$INSTALL" --remove >/dev/null
+check "default remove: clears ~/.agents/skills" [ ! -e "$HOME/.agents/skills/code-review" ]
+check "default remove: clears ~/.claude/skills" [ ! -e "$SKILLS/code-review" ]
 
 [ "$fails" -eq 0 ] && echo "install: all passed" || echo "install: $fails failed"
 [ "$fails" -eq 0 ]

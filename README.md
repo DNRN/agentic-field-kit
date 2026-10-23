@@ -14,22 +14,32 @@ Why this repo starts with an [ADR skill](docs/why-adrs.md): tests verify behavio
 
 Skills follow the [Agent Skills](https://agentskills.io) open standard — identical folders load natively in every harness above. The other component categories currently auto-load only via the Claude Code plugin; adapters for other harnesses are welcome.
 
-## Install skills (all harnesses)
+## Install skills
+
+Pick the row for your setup. Each harness was checked for what it reads and how it handles a skill found twice ([D8](docs/plans/design-improvements.md#d8-duplicate-skill-loading--done)).
+
+| You use | Install |
+| --- | --- |
+| Codex, Gemini CLI, OpenCode, Cursor, omp | `./install.sh` |
+| Claude Code with the [plugin](#claude-code-full-bundle-also-loads-agents-commands-hooks-styles) | The plugin; add `./install.sh` only for other harnesses. Never `--harness claude`: a personal copy of a plugin skill hides the plugin's `agentic-toolkit:*` name, which the commit gate tells the agent to run |
+| Claude Code without the plugin | `./install.sh --harness claude`, plus `--harness agents` for other harnesses |
 
 ```bash
-./install.sh                              # symlink into all three targets below
-./install.sh --harness agents --mode copy # subset, or copies instead of links
+./install.sh                              # symlink into ~/.agents/skills (the default)
+./install.sh --harness claude --mode copy # another target, or copies instead of links
 ./install.sh --check                      # validate skills against portability rules
-./install.sh --remove                     # undo
+./install.sh --remove                     # undo, in every target
 ```
 
-One symlink target covers most tools — `~/.agents/skills/` is read natively by Codex, Gemini CLI, Cursor, and OpenCode:
-
-| Target | Serves |
+| Target | Read by |
 | --- | --- |
-| `~/.agents/skills/` | Codex, Gemini CLI, Cursor, OpenCode (interop path) |
-| `~/.claude/skills/` | Claude Code (also read by Cursor and OpenCode) |
-| `~/.omp/agent/skills/` | omp |
+| `~/.agents/skills/` | Codex, Gemini CLI, OpenCode, Cursor, omp |
+| `~/.claude/skills/` | Claude Code; also OpenCode, and Cursor with third-party extensibility on |
+| `~/.omp/agent/skills/` | omp; needed only when its `~/.agents` provider is turned off |
+
+- A harness that reads one skill from two targets lists it once; OpenCode logs a warning. Codex is the exception: it lists a same-named skill twice unless both paths resolve to the same folder.
+- Codex names a *symlinked* skill `agentic-toolkit:<name>`, because its real path sits inside this plugin repo. `--mode copy` keeps the bare name.
+- In Claude Code, a personal `code-review` replaces the built-in `/code-review`.
 
 Symlinks stay live: `git pull` in this repo updates every harness at once. Per-project pinning: git submodule or sparse checkout, then `--mode copy` into the repo's `.agents/skills/`.
 

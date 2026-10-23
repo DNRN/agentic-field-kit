@@ -2,10 +2,16 @@
 # Install this repo's skills into agent harnesses' skill directories.
 # Symlink by default: one `git pull` updates every harness at once.
 #
-# Verified locations (see README compatibility table):
-#   ~/.agents/skills       read natively by Codex, Gemini CLI, Cursor, OpenCode
-#   ~/.claude/skills       Claude Code (also read by Cursor and OpenCode)
-#   ~/.omp/agent/skills    omp
+#   ./install.sh [--harness agents|claude|omp]... [--mode symlink|copy]
+#   ./install.sh --remove [--harness ...]    default: every target
+#   ./install.sh --check                     validate skills (portability)
+#
+# Targets, observed per harness (README "Install skills"):
+#   agents  ~/.agents/skills     default; Codex, Gemini CLI, OpenCode, Cursor, omp
+#   claude  ~/.claude/skills     Claude Code WITHOUT the plugin only: with the
+#                                plugin, an identical personal skill hides the
+#                                plugin's agentic-toolkit:<skill> names
+#   omp     ~/.omp/agent/skills  omp with its ~/.agents provider turned off
 set -euo pipefail
 shopt -s nullglob
 
@@ -14,7 +20,7 @@ ACTION=install
 HARNESSES=()
 
 usage() {
-  sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,/^[^#]/{/^#/s/^# \{0,1\}//p;}' "${BASH_SOURCE[0]}"
   exit "${1:-0}"
 }
 
@@ -61,8 +67,11 @@ if [ "$ACTION" = check ]; then
   exit "$status"
 fi
 
-mapfile -t ALL < <(compgen -W "agents claude omp")
-if [ "${#HARNESSES[@]}" -eq 0 ]; then HARNESSES=("${ALL[@]}"); fi
+# Install defaults to the one target that cannot shadow the Claude Code plugin;
+# remove defaults to every target, so installs made by older defaults go too.
+if [ "${#HARNESSES[@]}" -eq 0 ]; then
+  if [ "$ACTION" = remove ]; then HARNESSES=(agents claude omp); else HARNESSES=(agents); fi
+fi
 for h in "${HARNESSES[@]}"; do target_dir "$h" >/dev/null || die "unknown harness: $h"; done
 
 # Ours: a symlink into this repo's skills/, or a copy carrying our marker.

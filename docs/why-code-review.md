@@ -23,7 +23,7 @@ The pattern underneath: agentic coding makes writing cheap and review the bottle
 
 ## Using it
 
-**What loads where.** The skill and its rubric work in every harness (`./install.sh` symlinks them everywhere skills are read); where a harness has subagents but not this toolkit's agents, any read-only subagent given the rubric does the same job. The bundled subagent and the commit gate load via the Claude Code plugin:
+**What loads where.** The skill and its rubric work in every harness (`./install.sh` installs them where each harness reads skills; see the README's [install table](../README.md#install-skills)); where a harness has subagents but not this toolkit's agents, any read-only subagent given the rubric does the same job. The bundled subagent and the commit gate load via the Claude Code plugin:
 
 ```
 /plugin marketplace add DNRN/agentic-toolkit
