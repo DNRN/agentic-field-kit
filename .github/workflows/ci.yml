@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Shellcheck
-        run: shellcheck install.sh hooks/scripts/*.sh tests/*.sh
+        run: shellcheck install.sh hooks/scripts/*.sh tests/*.sh evals/*/*/scaffold.sh
       - name: Skill portability (install.sh --check)
         run: ./install.sh --check
       - name: Regression tests

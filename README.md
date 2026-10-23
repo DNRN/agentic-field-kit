@@ -65,18 +65,18 @@ Symlinks stay live: `git pull` in this repo updates every harness at once. Per-p
 | [`rules/`](rules/) | `AGENTS.md` / `CLAUDE.md` templates | Copy into a project |
 | [`prompts/`](prompts/) | Plan / spec / review templates | Referenced by skills & commands |
 | [`policies/`](policies/) | Permission allow/deny presets | Copy into project settings |
-| [`evals/`](evals/) | Golden tasks per component (manual checklists; [conversion to `claude plugin eval`](docs/plans/design-improvements.md#d7-convert-evals-to-claude-plugin-eval-format) planned) | Run by hand |
-| [`tests/`](tests/) | Deterministic regression tests for hooks and `install.sh` | `tests/run.sh` |
+| [`evals/`](evals/) | Golden tasks per component in `claude plugin eval` format, scored against a no-plugin baseline | [`claude plugin eval .`](evals/README.md#run) |
+| [`tests/`](tests/) | Deterministic regression tests for hooks, `install.sh`, and release metadata | `tests/run.sh` |
 | [`docs/`](docs/) | Rationale essays, [ADRs](docs/adr/), [plans](docs/plans/) | Read |
 
 ## Conventions
 
 - One component = one self-contained folder or file, kebab-case.
 - Skills: Agent Skills standard — frontmatter `name` must equal the folder name; keep frontmatter to `name` + `description` (+ optional `license`, `metadata`); the description is the discovery contract — write it as "use when …".
-- Every behavioral component ships with a matching eval or checklist under `evals/`.
+- Every behavioral component ships with eval cases under `evals/<component>/`, including a negative case.
 - No secrets, no machine-specific paths; scripts read relative to their component folder.
 - Agents, commands, and output styles are registered explicitly in `.claude-plugin/plugin.json` (the folder scan would also load each folder's README); `tests/run.sh` fails on an unregistered file.
-- Validate before pushing: `./install.sh --check`, `tests/run.sh`, and `claude plugin validate .` if you touched `.claude-plugin/`. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these plus shellcheck, an internal link and anchor check, and mermaid rendering on every push to `main` and every PR.
+- Validate before pushing: `./install.sh --check`, `tests/run.sh`, and `claude plugin validate .` if you touched `.claude-plugin/`. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these plus shellcheck, an internal link and anchor check, and mermaid rendering on every push to `main` and every PR. CI does not run the [eval suite](evals/README.md) (it needs model credentials and costs money): run it when a skill, agent, or hook changes.
 
 ## Contributing
 
