@@ -71,11 +71,17 @@ jobs:
           node-version: 22
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code
-      - name: Validate marketplace (strict)
-        run: claude plugin validate --strict .
-      # Not --strict: the validator scans agents/ and commands/ and warns on
-      # their README.md, although plugin.json's explicit lists keep those
-      # files from loading. tests/plugin-manifest.test.sh guards the lists.
+      # Not --strict here either: the validator scans agents/ and commands/ and
+      # warns that their README.md has no frontmatter, although plugin.json's
+      # explicit lists keep those files from loading (CLI 2.1.312 scans them in
+      # the marketplace check too; 2.1.288 didn't). tests/plugin-manifest.test.sh
+      # guards the lists. Every other warning or error fails the job.
+      - name: Validate marketplace
+        run: |
+          claude plugin validate --json . > validate.json || { cat validate.json; exit 1; }
+          jq -e '[.manifest.errors[], .manifest.warnings[], (.contents[] | .errors[]),
+                  (.contents[] | select(.file | endswith("/README.md") | not) | .warnings[])]
+                 | length == 0' validate.json > /dev/null || { cat validate.json; exit 1; }
       - name: Validate plugin manifest and components
         run: claude plugin validate .claude-plugin/plugin.json
 
