@@ -1,5 +1,4 @@
-//! What is installed where: the status values of the selective-install plan,
-//! computed exactly as `install.sh` does.
+//! What is installed where: the status values of the selective-install plan.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -90,7 +89,7 @@ impl Ctx {
                     return false;
                 };
                 match self.source.dir() {
-                    // As install.sh: the link's target lies inside this toolkit's skills/.
+                    // The link's target lies inside this toolkit's skills/.
                     Some(dir) => {
                         let skills = dunce::simplified(&dir.join("skills")).to_path_buf();
                         let target = dunce::simplified(&target).to_path_buf();

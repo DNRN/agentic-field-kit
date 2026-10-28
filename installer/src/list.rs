@@ -1,4 +1,4 @@
-//! `--list`: the status table, line for line as `install.sh --list` prints it.
+//! `--list`: the status table.
 
 use std::fmt::Write as _;
 

@@ -38,7 +38,7 @@ Phase 1 comes first because it turns rules the model must remember into determin
 | `dependency-upgrade` | Bumping a dependency | Changelog read, breaking-change scan, callers updated, tests run |
 | `glossary` | Domain terms are introduced or disputed | Maintain `docs/GLOSSARY.md`; ADRs and docs use its terms |
 
-**Acceptance.** Each skill passes `./install.sh --check` and has a golden task plus a negative case (trigger must not fire on unrelated work).
+**Acceptance.** Each skill passes `agentic-toolkit --check --source .` and has a golden task plus a negative case (trigger must not fire on unrelated work).
 
 ## Phase 3: subagents
 

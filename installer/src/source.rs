@@ -27,7 +27,7 @@ pub enum Content {
 pub enum Source {
     Embedded,
     /// An absolute toolkit tree, as given (not resolved through links), so that
-    /// links made into it compare the way `install.sh`'s did.
+    /// links made into it are recognised by plain path comparison.
     Dir(PathBuf),
 }
 
@@ -165,7 +165,7 @@ fn read_file(path: &Path) -> Option<File> {
     })
 }
 
-/// A file or folder on disk, read the way `install.sh` hashes it: a regular
+/// A file or folder on disk, read the way the hash sees it: a regular
 /// file (following a top-level link), or the regular files below a folder,
 /// not descending into or listing symlinks (`find . -type f`).
 pub fn read_content(path: &Path) -> Option<Content> {
@@ -238,8 +238,8 @@ pub fn write_content(dest: &Path, content: &Content) -> io::Result<()> {
     }
 }
 
-/// The first `"key": "value"` string in a JSON text, the way install.sh's sed
-/// reads `version` from plugin.json. Enough for flat manifests.
+/// The first `"key": "value"` string in a JSON text, such as `version` in
+/// plugin.json. Enough for flat manifests.
 pub fn json_string_field(text: &str, key: &str) -> Option<String> {
     let needle = format!("\"{key}\"");
     let mut rest = text;

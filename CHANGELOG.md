@@ -4,22 +4,22 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-28
+
 ### Added
 
+- `agentic-toolkit`, a single installer binary for Linux, macOS, and Windows with the components built in ([ADR 0009](docs/adr/0009-installer-in-rust.md), [ADR 0010](docs/adr/0010-components-embedded-in-binary.md)). Install it with the shell or PowerShell script from the GitHub release, or `cargo install --git`. No clone, git, Bash, or runtime needed.
+- Selective install into the project ([ADR 0006](docs/adr/0006-project-scope-install-default.md)): name components (`agentic-toolkit code-reviewer`) and what they require comes along. Copies go to `.agents/skills`, plus `.claude/skills` and `.claude/agents` for Claude Code unless the project enables the plugin; commit them. `code-reviewer` and `doc-auditor` can now be installed without the plugin.
+- A terminal UI when `agentic-toolkit` runs on a terminal without arguments: status per component in the project and globally, details, marks to install, remove, or update, a plan to review before anything changes, and the Entropy Fox logo.
+- `--list`, `--update`, `--remove`, `--all`, `--project DIR`, `--global`, `--force`, `--dry-run`, `--yes`, `--check`, and `--source DIR` for a toolkit working tree.
+- A manifest per scope, `.agents/agentic-toolkit.tsv`, records what was installed, why, and a content hash ([ADR 0008](docs/adr/0008-project-install-manifest.md)). `--update` refreshes what changed in a new release, restores deleted copies, installs new requirements, and asks before removing retired components; it and `--remove` leave locally edited copies alone without `--force`.
 - `catalog.tsv` lists every installable component with its kind, harnesses, requirements, and a summary ([ADR 0007](docs/adr/0007-component-catalog.md)). `tests/catalog.test.sh` fails on a component without a row.
-- `install.sh` installs single components and what they require, into a project ([ADR 0006](docs/adr/0006-project-scope-install-default.md)): copies in `.agents/skills`, plus `.claude/skills` and `.claude/agents` for Claude Code unless the project enables the plugin. `code-reviewer` and `doc-auditor` can now be installed without the plugin.
-- A manifest per scope, `.agents/agentic-toolkit.tsv`, records what was installed, why, and a content hash ([ADR 0008](docs/adr/0008-project-install-manifest.md)).
-- `install.sh --list` shows each component's status in the project and globally, and flags a skill installed in both.
-- `install.sh --update` refreshes what changed upstream, restores deleted copies, installs new requirements, and asks before removing retired components. It leaves locally edited copies alone without `--force`; so does `--remove`.
-- Interactive menu when `install.sh` runs on a terminal without arguments.
-- `--project DIR`, `--global`, `--force`, `--dry-run`, `--yes`, `--interactive`.
-- CI runs the installer tests on Windows (Git Bash); `.gitattributes` keeps every checkout LF.
-- `installer/`: the Rust installer that replaces `install.sh` in 0.3.0 ([ADR 0009](docs/adr/0009-installer-in-rust.md), [plan](docs/plans/rust-installer.md)). Not released; it does everything `install.sh` does except the menu, and CI runs the installer tests against it on Linux, macOS, and Windows.
+- CI builds and tests the installer on Linux, macOS, and Windows; releases are built with dist on `installer/vX.Y.Z` tags. `.gitattributes` keeps every checkout LF.
+- The Entropy Fox name and logo in `assets/brand/`, outside the MIT licence ([ADR 0011](docs/adr/0011-brand-assets-not-mit.md)).
 
 ### Changed
 
-- **Breaking:** `install.sh` installs into the project (the git root of the working directory) by default; the old behavior is `install.sh --global --all`. It refuses to run in its own clone, and without a terminal it needs component names or `--all`. `--harness` and `--mode` require `--global`.
-- On Windows, `--global` copies by default instead of linking.
+- **Breaking:** `install.sh` is gone; use `agentic-toolkit`. It installs into the project (the git root of the working directory) by default; the old behavior is `agentic-toolkit --global --all`. Without a terminal it needs component names or `--all`. `--harness` and `--mode` require `--global`. Global installs are copies; symlinks into a toolkit folder need `--source DIR`.
 - Corrected the 0.1.0 install advice: in Claude Code, only a personal *symlink* to the plugin's skill folder hides the plugin's `agentic-toolkit:*` skill; a personal copy is listed next to it.
 
 ## [0.1.0] - 2026-10-23
@@ -39,5 +39,6 @@ First release.
 
 - `./install.sh` installs into `~/.agents/skills` only (Codex, Gemini CLI, OpenCode, Cursor, omp). A copy in `~/.claude/skills` hid the plugin's `agentic-toolkit:*` skills in Claude Code, so that target is now opt-in (`--harness claude`) for Claude Code without the plugin. `--remove` still clears every target.
 
-[Unreleased]: https://github.com/DNRN/agentic-toolkit/compare/agentic-toolkit--v0.1.0...HEAD
+[Unreleased]: https://github.com/DNRN/agentic-toolkit/compare/agentic-toolkit--v0.2.0...HEAD
+[0.2.0]: https://github.com/DNRN/agentic-toolkit/compare/agentic-toolkit--v0.1.0...agentic-toolkit--v0.2.0
 [0.1.0]: https://github.com/DNRN/agentic-toolkit/releases/tag/agentic-toolkit--v0.1.0

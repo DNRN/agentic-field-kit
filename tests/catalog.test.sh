@@ -62,7 +62,7 @@ for path in "$ROOT"/skills/*/SKILL.md "$ROOT"/agents/*.md "$ROOT"/hooks/scripts/
   [ "$(basename "$path")" = README.md ] && continue
   rel=${path#"$ROOT/"}
   rel=${rel%/SKILL.md}
-  case " $paths " in *" $rel "*) ;; *) fail "$rel has no row in catalog.tsv, so install.sh can't install it" ;; esac
+  case " $paths " in *" $rel "*) ;; *) fail "$rel has no row in catalog.tsv, so the installer can't install it" ;; esac
 done
 
 [ "$fails" -eq 0 ] && echo "catalog: all passed" || echo "catalog: $fails failed"

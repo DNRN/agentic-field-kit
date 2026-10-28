@@ -5,11 +5,11 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use agentic_toolkit::catalog::{Catalog, is_name};
-use agentic_toolkit::engine::{self, Mode, Options, Plan, Verb};
+use agentic_toolkit::engine::{self, Action, Mode, Options, Plan};
 use agentic_toolkit::scope::{self, Scope, home};
 use agentic_toolkit::source::Source;
 use agentic_toolkit::status::Ctx;
-use agentic_toolkit::{check, list};
+use agentic_toolkit::{check, list, tui};
 
 /// Install agentic-toolkit components into a project or globally.
 ///
@@ -59,19 +59,9 @@ struct Args {
     /// Do not ask (also removes retired and unneeded components)
     #[arg(long, short = 'y')]
     yes: bool,
-    /// Open the menu without a terminal
-    #[arg(long)]
-    interactive: bool,
     /// Read components from this toolkit folder instead of the built-in ones
     #[arg(long, value_name = "DIR")]
     source: Option<PathBuf>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Action {
-    Install,
-    Update,
-    Remove,
 }
 
 fn die(msg: &str) -> ExitCode {
@@ -112,11 +102,7 @@ fn run(
     names: &[String],
     all: bool,
 ) -> Result<bool, String> {
-    let plan: Plan = match action {
-        Action::Install => engine::plan_install(ctx, opts, scope, names, all)?,
-        Action::Update => engine::plan_update(ctx, opts, scope, names)?,
-        Action::Remove => engine::plan_remove(ctx, opts, scope, names)?,
-    };
+    let plan: Plan = engine::plan_action(ctx, opts, action, scope, names, all)?;
     if plan.steps.is_empty() {
         println!("Nothing to do.");
         return Ok(true);
@@ -150,10 +136,9 @@ fn run(
             ok &= warn_both_scopes(ctx, &plan, run);
         }
         if !applied.wrote.is_empty() || applied.changed {
-            let root = ctx.root.as_deref().expect("project root");
             println!(
-                "Commit the changes so teammates get the same set: git -C \"{}\" add .agents .claude",
-                root.display()
+                "{}",
+                engine::commit_hint(ctx.root.as_deref().expect("project root"))
             );
         }
     }
@@ -163,27 +148,16 @@ fn run(
     Ok(ok)
 }
 
-/// Same skill in the project and globally: Codex lists it twice; Claude Code
-/// and Cursor use the global copy (selective-install plan, "Evidence").
+/// Same skill in the project and globally: warn, and on a terminal offer to
+/// remove the global copy.
 fn warn_both_scopes(ctx: &Ctx, plan: &Plan, run: &Run) -> bool {
     let mut ok = true;
-    for s in &plan.steps {
-        if !matches!(s.verb, Verb::Write | Verb::Ok | Verb::Promote)
-            || ctx.component(&s.name).is_none_or(|c| c.kind != "skill")
-        {
-            continue;
-        }
-        let g = ctx.status(Scope::Global, &s.name);
-        if matches!(g.as_str(), "-" | "n/a" | "plugin") {
-            continue;
-        }
-        println!(
-            "! {} is also installed globally ({g}): Codex lists it twice; Claude Code and Cursor use the global copy.",
-            s.name
-        );
+    for (name, g) in engine::both_scopes(ctx, plan) {
+        println!("{}", engine::both_scopes_warning(&name, &g));
         if g == "foreign" {
             continue;
         }
+        let s = &name;
         if is_tty() && !run.yes && confirm("  Remove the global copy?") {
             let opts = Options {
                 force: false,
@@ -201,7 +175,7 @@ fn warn_both_scopes(ctx: &Ctx, plan: &Plan, run: &Run) -> bool {
                 &global,
                 Action::Remove,
                 Scope::Global,
-                std::slice::from_ref(&s.name),
+                std::slice::from_ref(s),
                 false,
             ) {
                 Ok(done) => ok &= done,
@@ -211,17 +185,14 @@ fn warn_both_scopes(ctx: &Ctx, plan: &Plan, run: &Run) -> bool {
                 }
             }
         } else {
-            println!(
-                "  Remove it with: agentic-toolkit --global --remove {}",
-                s.name
-            );
+            println!("  Remove it with: agentic-toolkit --global --remove {s}");
         }
     }
     ok
 }
 
 fn main() -> ExitCode {
-    // Usage errors exit 1, as install.sh's do; --help and --version exit 0.
+    // Usage errors exit 1; --help and --version exit 0.
     let args = match Args::try_parse() {
         Ok(args) => args,
         Err(e) => {
@@ -247,7 +218,7 @@ fn main() -> ExitCode {
         return die(&format!("not a component name: {bad} (see --list)"));
     }
     let source = match &args.source {
-        // Absolute and with `..` resolved, without following links, as install.sh's `cd && pwd`.
+        // Absolute and with `..` resolved, without following links (bash's `cd && pwd`).
         Some(dir) if dir.is_dir() => match std::path::absolute(dir) {
             Ok(dir) => Source::Dir(scope::normalize(&dir)),
             Err(e) => return die(&format!("{}: {e}", dir.display())),
@@ -302,18 +273,21 @@ fn main() -> ExitCode {
         Err(e) => return die(&format!("can't read catalog.tsv: {e}")),
     };
 
-    let action = if args.list {
-        None
+    enum Command {
+        List,
+        Menu,
+        Act(Action),
+    }
+    let command = if args.list {
+        Command::List
     } else if args.update {
-        Some(Action::Update)
+        Command::Act(Action::Update)
     } else if args.remove {
-        Some(Action::Remove)
+        Command::Act(Action::Remove)
     } else if !args.names.is_empty() || args.all {
-        Some(Action::Install)
-    } else if args.interactive || is_tty() {
-        return die(
-            "the menu is not in the Rust installer yet (plan R3): name components, or use --list, --update, --remove",
-        );
+        Command::Act(Action::Install)
+    } else if is_tty() {
+        Command::Menu
     } else {
         let names: Vec<&str> = catalog.names().collect();
         return die(&format!(
@@ -324,11 +298,11 @@ fn main() -> ExitCode {
     if args.all && !args.names.is_empty() {
         return die("give component names or --all, not both");
     }
-    if args.all && action != Some(Action::Install) {
+    if args.all && !matches!(command, Command::Act(Action::Install)) {
         return die("--all installs; --update and --remove without names cover everything");
     }
-    if action.is_none() && !args.names.is_empty() {
-        return die("--list and the menu take no component names");
+    if matches!(command, Command::List) && !args.names.is_empty() {
+        return die("--list takes no component names");
     }
 
     let (root, why) = match scope::project(args.project.as_deref(), &source) {
@@ -348,10 +322,35 @@ fn main() -> ExitCode {
         root,
         home: home(),
     };
+    let opts = Options {
+        force: args.force,
+        mode_arg,
+        mode,
+        harnesses: args.harness,
+    };
 
-    let Some(action) = action else {
-        print!("{}", list::table(&ctx, why.as_deref()));
-        return ExitCode::SUCCESS;
+    let action = match command {
+        Command::List => {
+            print!("{}", list::table(&ctx, why.as_deref()));
+            return ExitCode::SUCCESS;
+        }
+        Command::Menu => {
+            let app = tui::App::new(ctx, opts, args.global, args.dry_run, why);
+            return match tui::run(app) {
+                Ok((log, ok)) => {
+                    for line in log {
+                        println!("{line}");
+                    }
+                    if ok {
+                        ExitCode::SUCCESS
+                    } else {
+                        ExitCode::FAILURE
+                    }
+                }
+                Err(e) => die(&e.to_string()),
+            };
+        }
+        Command::Act(action) => action,
     };
     let scope = if args.global {
         Scope::Global
@@ -359,12 +358,6 @@ fn main() -> ExitCode {
         Scope::Project
     } else {
         return die(why.as_deref().unwrap_or("no project"));
-    };
-    let opts = Options {
-        force: args.force,
-        mode_arg,
-        mode,
-        harnesses: args.harness,
     };
     let flags = Run {
         dry_run: args.dry_run,

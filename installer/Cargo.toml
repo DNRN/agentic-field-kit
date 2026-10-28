@@ -1,7 +1,7 @@
 [package]
 name = "agentic-toolkit"
 # The toolkit release: equal to .claude-plugin/plugin.json (tests/release.test.sh).
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.99"
 description = "Install agentic-toolkit components into a project or globally"
@@ -14,9 +14,17 @@ build = "build.rs"
 name = "agentic-toolkit"
 path = "src/main.rs"
 
+# publish = false keeps it off crates.io; dist still releases the binary (ADR 0010).
+[package.metadata.dist]
+dist = true
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 dunce = "1"
+image = { version = "0.25", default-features = false, features = ["png"] }
+ratatui = "0.30"
+# No chafa (a system library) and no image formats beyond PNG.
+ratatui-image = { version = "11", default-features = false, features = ["crossterm"] }
 sha2 = "0.10"
 
 [dev-dependencies]

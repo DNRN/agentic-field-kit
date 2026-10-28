@@ -1,4 +1,4 @@
-//! The content hash of ADR 0008, byte-compatible with `install.sh`:
+//! The content hash of ADR 0008 (the same as the bash installer's, before 0.2.0):
 //!
 //! - a file: sha256 of its bytes with every `\r` removed (`tr -d '\r'`);
 //! - a folder: sha256 of the lines `"<file hash> ./<path>\n"` for every regular
@@ -58,7 +58,7 @@ mod tests {
     use super::*;
     use std::fs;
 
-    // Expected values computed with install.sh's hash_of on the same fixtures
+    // Expected values computed with the bash installer's hash_of on the same fixtures
     // (bash 5.3, GNU coreutils), so these tests need no bash.
 
     #[test]
