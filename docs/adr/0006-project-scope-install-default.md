@@ -4,7 +4,7 @@ Date: 2026-10-23
 
 ## Status
 
-Proposed
+Accepted
 
 Plan: [selective install](../plans/selective-install.md). Related: [ADR 0007](0007-component-catalog.md) (catalog), [ADR 0008](0008-project-install-manifest.md) (manifest).
 

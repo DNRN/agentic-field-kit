@@ -7,7 +7,7 @@ Most users need one or two components from this repository, not all of them in e
 - installs into the current project by default; global install is opt-in,
 - updates by pulling the toolkit and rerunning the installer, and removes what it installed.
 
-Decisions, all `Proposed`:
+Decisions, all `Accepted`:
 
 - [ADR 0006](../adr/0006-project-scope-install-default.md): project scope is the default, and project installs are copies.
 - [ADR 0007](../adr/0007-component-catalog.md): installable components are declared in `catalog.tsv`.
@@ -150,7 +150,7 @@ Components have no version numbers of their own (ADR 0008).
 | S3 | Interactive menu | S2 | — | done |
 | S4 | Claude Code agents in the project | S2 | — | done |
 | S5 | `commit-gate` outside the plugin | S4, roadmap phase 1 | new, if the gate's skill names become configurable | deferred |
-| S6 | Docs and release | S2–S4, SW | — | docs done; release 0.2.0 and ADR acceptance open |
+| S6 | Docs and release | S2–S4, SW | — | docs done, ADRs accepted; release 0.2.0 open |
 
 ## S0. Correct the D8 finding
 
@@ -244,7 +244,7 @@ Components have no version numbers of their own (ADR 0008).
   - Added: catalog, manifest, `--list`, selective, interactive, and project install; `--update`.
   - Changed (breaking): the default scope, and non-interactive runs now require names or `--all`.
 - Release as minor `0.2.0`.
-- After user confirmation, flip ADRs 0006, 0007, and 0008 to `Accepted`.
+- After user confirmation, flip ADRs 0006, 0007, and 0008 to `Accepted` (done 2026-10-28).
 
 **Acceptance.** `tests/run.sh`, `./install.sh --check`, and CI are green. Following the README from a fresh clone installs one skill into a scratch project.
 

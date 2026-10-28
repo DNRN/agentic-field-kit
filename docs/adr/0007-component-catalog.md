@@ -4,7 +4,7 @@ Date: 2026-10-23
 
 ## Status
 
-Proposed
+Accepted
 
 Plan: [selective install](../plans/selective-install.md). Related: [ADR 0006](0006-project-scope-install-default.md) (install scope), [ADR 0008](0008-project-install-manifest.md) (what is installed where).
 
