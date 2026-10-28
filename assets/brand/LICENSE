@@ -1,0 +1,14 @@
+Entropy Fox name and logo
+
+Copyright (c) 2026 Entropy Fox. All rights reserved.
+
+The files in this folder (assets/brand/), the name "Entropy Fox", and the
+Entropy Fox logo are not covered by the MIT licence in the repository root.
+
+Permission is granted to show them unmodified as part of agentic-toolkit and
+of forks of agentic-toolkit, including in builds of its installer. No other
+use is permitted without written permission from Entropy Fox
+(https://entropyfox.com).
+
+A fork that wants its own identity replaces this folder and the name in
+installer/src/brand.rs.

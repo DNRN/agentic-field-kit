@@ -85,13 +85,13 @@ Interactive behaviour moves from the piped-stdin menu tests to Rust tests on Rat
 | R0 | This plan; ADRs 0009–0011 accepted | — | 0009–0011 | done |
 | R1 | Workspace, CI, `--check` and `--list` from embedded or `--source` | R0 | 0009, 0010 | done (CI green on Linux, macOS, Windows, 2026-10-28) |
 | R2 | Engine port: install, update, remove at parity | R1 | 0009 | done (CI green on Linux, macOS, Windows, 2026-10-28) |
-| R3 | Terminal UI | R2 | 0009 | open |
-| R4 | Entropy Fox brand | R3 | 0011 | open |
+| R3 | Terminal UI | R2 | 0009 | done: `TestBackend` tests, pseudo-terminal run on Linux |
+| R4 | Entropy Fox brand | R3 | 0011 | done: half-blocks checked in a pseudo-terminal and a rendered screenshot; Kitty, Sixel, and iTerm2 not yet seen in a real terminal |
 | R5 | Releases with dist | R2 | 0010 | open |
 | R6 | Cutover: remove `install.sh`, docs, release 0.3.0 | R2–R5 | 0009, 0010 | open |
 | R7 | Guides in the UI | R6 | new, if guides need their own format | later |
 
-Before R1: merge PR #1 (done 2026-10-28) and release 0.2.0 (bash), so users get selective install now and the Rust port has a released contract to match.
+Before R1: merge PR #1 (done 2026-10-28). The separate bash release (0.2.0) is dropped: there are no users yet, so the first release with selective install is the Rust installer, as 0.2.0.
 
 ## R1. Workspace, CI, read-only commands
 

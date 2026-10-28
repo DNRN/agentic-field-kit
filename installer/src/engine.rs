@@ -124,7 +124,7 @@ pub fn disp(scope: Scope, p: &str) -> String {
 }
 
 /// Paths a fresh install writes.
-fn layout(ctx: &Ctx, opts: &Options, scope: Scope, name: &str) -> Vec<String> {
+pub fn layout(ctx: &Ctx, opts: &Options, scope: Scope, name: &str) -> Vec<String> {
     let Some(c) = ctx.component(name) else {
         return Vec::new();
     };
@@ -316,6 +316,55 @@ fn plan_write(
     } else {
         plan.ok(name, "already installed");
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Action {
+    Install,
+    Update,
+    Remove,
+}
+
+/// The plan for one action; `all` applies to `Install` only.
+pub fn plan_action(
+    ctx: &Ctx,
+    opts: &Options,
+    action: Action,
+    scope: Scope,
+    names: &[String],
+    all: bool,
+) -> Result<Plan, String> {
+    match action {
+        Action::Install => plan_install(ctx, opts, scope, names, all),
+        Action::Update => plan_update(ctx, opts, scope, names),
+        Action::Remove => plan_remove(ctx, opts, scope, names),
+    }
+}
+
+/// Skills the plan installs into the project that are also installed globally,
+/// with their global status: Codex lists them twice; Claude Code and Cursor
+/// use the global copy (selective-install plan, "Evidence").
+pub fn both_scopes(ctx: &Ctx, plan: &Plan) -> Vec<(String, String)> {
+    plan.steps
+        .iter()
+        .filter(|s| matches!(s.verb, Verb::Write | Verb::Ok | Verb::Promote))
+        .filter(|s| ctx.component(&s.name).is_some_and(|c| c.kind == "skill"))
+        .map(|s| (s.name.clone(), ctx.status(Scope::Global, &s.name)))
+        .filter(|(_, g)| !matches!(g.as_str(), "-" | "n/a" | "plugin"))
+        .collect()
+}
+
+pub fn both_scopes_warning(name: &str, global: &str) -> String {
+    format!(
+        "! {name} is also installed globally ({global}): Codex lists it twice; Claude Code and Cursor use the global copy."
+    )
+}
+
+pub fn commit_hint(root: &Path) -> String {
+    format!(
+        "Commit the changes so teammates get the same set: git -C \"{}\" add .agents .claude",
+        root.display()
+    )
 }
 
 /// `names`, or with `all` every component the scope supports, plus what they require.
