@@ -28,5 +28,6 @@ skills/<kebab-name>/
 
 ## Distribution
 
-- `./install.sh` symlinks every skill into all supported harnesses at once (Codex, Gemini CLI, Cursor, OpenCode via `~/.agents/skills/`; Claude Code via `~/.claude/skills/`; omp via `~/.omp/agent/skills/`).
-- Or symlink/copy a single folder into any harness's skills dir by hand.
+- `install.sh` copies the skills you pick into a project's `.agents/skills/` (Codex, Gemini CLI, Cursor, OpenCode, omp) and `.claude/skills/` (Claude Code, unless the project enables the plugin), or links them into `~/.agents/skills/` with `--global`: see [Install](../README.md#install).
+- A new skill needs a row in [`catalog.tsv`](../catalog.tsv), or the installer can't offer it; `tests/run.sh` fails without one.
+- Or copy a single folder into any harness's skills dir by hand.

@@ -1,0 +1,7 @@
+kind	name	path	harnesses	requires	summary
+skill	adr-planning	skills/adr-planning	all	-	Record design decisions as ADRs
+skill	code-review	skills/code-review	all	-	Fresh-eyes review before commit
+skill	doc-sync	skills/doc-sync	all	-	Keep docs true to the code
+agent	code-reviewer	agents/code-reviewer.md	claude	code-review	Read-only code review subagent
+agent	doc-auditor	agents/doc-auditor.md	claude	doc-sync	Read-only doc audit subagent
+hook	commit-gate	hooks/scripts/commit-gate.sh	plugin	code-review,doc-sync	Ask before unreviewed commits

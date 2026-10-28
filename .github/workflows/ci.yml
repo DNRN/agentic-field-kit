@@ -19,11 +19,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Shellcheck
-        run: shellcheck install.sh hooks/scripts/*.sh tests/*.sh
+        run: shellcheck install.sh hooks/scripts/*.sh tests/*.sh evals/*/*/scaffold.sh
       - name: Skill portability (install.sh --check)
         run: ./install.sh --check
       - name: Regression tests
         run: bash tests/run.sh
+
+  windows:
+    name: Installer on Windows (Git Bash)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The tests create symlinks as fixtures (someone else's links, installs
+      # made before the manifest); without this, Git Bash's ln -s copies.
+      - name: Catalog and installer tests
+        shell: bash
+        env:
+          MSYS: winsymlinks:nativestrict
+        run: |
+          bash tests/catalog.test.sh
+          bash tests/install.test.sh
 
   plugin:
     name: Plugin manifests

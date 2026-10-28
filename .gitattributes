@@ -1,0 +1,3 @@
+# LF in every checkout: bash scripts with CRLF fail in Git Bash, and skills
+# copied into projects should not change on a Windows checkout.
+* text=auto eol=lf

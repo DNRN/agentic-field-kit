@@ -12,10 +12,11 @@ Follow-ups from the 2026-10-22 repo review. Bugs from that review are fixed (see
 | D4 | ~~Configurable docs paths for the docs check~~ — done | D3 | [0004](../adr/0004-configurable-docs-paths.md) supersedes 0003's trigger rule |
 | D5 | ~~Hook prefilter for non-commit Bash calls~~ — done | D3 | — |
 | D6 | ~~Single-source review and audit rubrics~~ — done | — | [0005](../adr/0005-rubrics-live-in-skills.md) |
-| D7 | Convert evals to `claude plugin eval` format | D6 | — |
-| D8 | Document and prevent duplicate skill loading | — | — |
-| D9 | Release hygiene: `.gitignore`, CHANGELOG, version tags | D3 | — |
+| D7 | ~~Convert evals to `claude plugin eval` format~~ — done | D6 | — |
+| D8 | ~~Document and prevent duplicate skill loading~~ — done | — | — |
+| D9 | ~~Release hygiene: `.gitignore`, CHANGELOG, version tags~~ — done | D3 | — |
 | D10 | ~~Resolve `code-review` / `doc-sync` skill-command name collisions~~ — done (with D6) | — | [0005](../adr/0005-rubrics-live-in-skills.md) |
+| D11 | Commit gate ignores formatting-only diffs | D7 | — |
 
 ## D1. Accept ADRs 0001–0003 — done
 
@@ -83,29 +84,52 @@ A link check catches missing files and anchors, not a link to the wrong existing
 
 Confirmed in a real session: loading `agentic-toolkit:code-review` from inside the command re-invoked the command, and a bare `code-review` loaded Claude Code's built-in skill. The commands were removed; the skills are the entry points (`/agentic-toolkit:code-review` still works, now naming the skill). The init event now lists each `agentic-toolkit:` skill, slash command, and agent once. See [ADR 0005](../adr/0005-rubrics-live-in-skills.md).
 
-## D7. Convert evals to `claude plugin eval` format
+## D7. Convert evals to `claude plugin eval` format — done
 
-**Problem.** `claude plugin eval` reads `evals/**/case.yaml` or `prompt.md` + `graders/*.md`; the current flat `evals/<component>.md` files are manual checklists it does not run.
+**Problem.** `claude plugin eval` reads `evals/**/case.yaml` or `prompt.md` + `graders/*.md`; the flat `evals/<component>.md` files were manual checklists it did not run.
 
-**Change.** Scaffold with `claude plugin eval init`, one case directory per golden task (`evals/code-review/seeded-bugs/…`), scaffold scripts building the scratch repos, graders encoding the existing success criteria. Hook checks stay in `tests/` (deterministic, no model needed).
+**Change.** One case directory per golden task and negative case, grouped by component (`evals/code-review/seeded-bugs/…`): 13 cases, each with a `scaffold.sh` that builds the scratch repo and graders encoding the old success criteria, mostly free ones (`regex` over produced files and the HEAD reflog, `tool_used`, `file_exists`), `llm` only for short replies. The flat checklists are gone. Hook checks stay in `tests/` (deterministic, no model needed).
 
-**Acceptance.** `claude plugin eval . --trust-plugin` runs every golden task with a with/without-plugin comparison; README and `evals/README.md` updated to say so.
+**Acceptance.** `claude plugin eval . --trust-plugin` runs every golden task with a with/without-plugin comparison; README and `evals/README.md` updated to say so. Done 2026-10-23: the full suite ran with `--scaffold --allow-tools Bash Edit Write --runs 1`, both arms, in 157 s for $3.86. 12 of 13 cases passed with the plugin; mean Δ +0.16. The plugin raised the score on 5 cases (largest: `adr-planning-plan-feature`, 0.2 → 1.0; `code-review-seeded-bugs`, 0.43 → 1.0, where the baseline missed the untested VIP branch) and tied on 7, where Claude without the plugin already passes. It lost on `code-review-formatting-only`: the gate blocks a whitespace-only commit (D11). Every skill-fired and rubric-read indicator passed. The single run per arm is noisy; the default 3 runs is the number to trust.
 
-## D8. Duplicate skill loading
+Found while running: inside eval runs `git` is masked (`permission denied`, exit 126) on this Arch machine, though a normal sandboxed session runs it; a user-owned copy of the binary first on `PATH` works. Workaround in [`evals/README.md`](../../evals/README.md#known-issues).
 
-**Problem.** Default `./install.sh` links into `~/.agents/skills` and `~/.claude/skills`; Cursor and OpenCode read both, and Claude Code plugin users also get `skills/` from the plugin. Effect of duplicates per harness is unverified.
+## D8. Duplicate skill loading — done
 
-**Change.** Verify per harness; document the recommended install set (plugin users: `--harness agents --harness omp`); change the default only if duplicates cause real conflicts.
+**Problem.** Default `./install.sh` linked into `~/.agents/skills`, `~/.claude/skills`, and `~/.omp/agent/skills`; several harnesses read more than one of these, and Claude Code plugin users also get `skills/` from the plugin. Effect of duplicates per harness was unverified.
 
-**Evidence so far (Claude Code, 2026-10-22).** With `~/.claude/skills/adr-planning` linked by an earlier `./install.sh` and the plugin loaded, the session lists only the bare `adr-planning`; the plugin's `agentic-toolkit:adr-planning` does not appear. Risk to check: a user-level `code-review` link would share its bare name with Claude Code's built-in `code-review` skill, which wins a bare-name lookup in plugin sessions (observed during D6).
+**Change.** Verify per harness; document the recommended install set; change the default only if duplicates cause real conflicts.
 
-**Acceptance.** README states one recommended install per setup, backed by a checked observation per harness.
+**Observed 2026-10-23**, each harness under an isolated `HOME`, two same-named skills with different content placed in two directories it reads:
 
-## D9. Release hygiene
+| Harness | Reads | Same skill in two places |
+| --- | --- | --- |
+| Claude Code 2.1.288 (`system/init` skill list) | `~/.claude/skills`, not `~/.agents/skills` | Personal symlink to the plugin's own skill folder: the plugin's `agentic-toolkit:<skill>` disappears; `/agentic-toolkit:code-review` then answers "isn't installed in this session". A personal copy, even with identical content, or different content: both load (corrected 2026-10-23, see [selective install](selective-install.md#evidence)). A personal `code-review` replaces the built-in `/code-review` |
+| omp 18.12.5 (`skill://` listing) | `~/.omp/agent/skills` and `~/.agents/skills` | Same folder or identical copies: listed once. Different content: the `~/.omp` copy keeps the name, the other becomes `agents/<name>` |
+| Codex 0.164.0 (app-server `skills/list`) | `~/.agents/skills`, `~/.codex/skills` | Listed twice unless both resolve to the same folder. A symlink into this repo is named `agentic-toolkit:<name>` (real path under `.claude-plugin/`); a copy keeps the bare name |
+| Gemini CLI 0.65.0 (`gemini skills list`) | `~/.agents/skills`, `~/.gemini/skills` | Listed once, `~/.agents` wins, "Skill conflict detected" on stderr |
+| OpenCode 1.19.4 (`opencode debug skill`) | `~/.agents/skills`, `~/.claude/skills`, `~/.config/opencode/skills` | Listed once, last directory scanned wins, "duplicate skill name" in the log only |
+| Cursor Agent CLI 2026.10.22 | `~/.agents/skills`, `~/.cursor/skills`; `~/.claude/skills` only with third-party extensibility on | Not run: every listing command needs a login. From [its docs](https://cursor.com/docs/skills) and the CLI's bundled code, listed once |
+
+The Claude Code row is a real conflict: the old default hid every plugin skill, including the `/agentic-toolkit:code-review` and `/agentic-toolkit:doc-sync` that `commit-gate.sh`'s denial tells the agent to run. It also contradicts Claude Code's docs, which say plugin skills always load alongside personal ones. Everything else is harmless.
+
+**Result.** `./install.sh` now installs into `~/.agents/skills` only, which covers Codex, Gemini CLI, OpenCode, Cursor, and omp and cannot shadow the plugin. `--remove` still defaults to every target, so links made by the old default go too. README lists one install per setup; `tests/install.test.sh` fails if the default touches `~/.claude/skills`.
+
+**Acceptance.** README states one recommended install per setup, backed by a checked observation per harness. Done 2026-10-23; Cursor is the one harness checked from docs and code instead of a run.
+
+## D9. Release hygiene — done
 
 **Change.** `.gitignore` (`evals/results/`), `CHANGELOG.md` (Keep a Changelog), bump `plugin.json` version per release, tag with `claude plugin tag`.
 
-**Acceptance.** Each release has a changelog entry, a version bump, and a tag.
+**Acceptance.** Each release has a changelog entry, a version bump, and a tag. Done 2026-10-23: the release steps are in the README's [Releasing](../../README.md#releasing) section; `tests/release.test.sh` fails when `plugin.json`'s version has no dated changelog entry or the `Unreleased` section is missing. First release `0.1.0`, tagged `agentic-toolkit--v0.1.0`.
+
+## D11. Commit gate ignores formatting-only diffs
+
+**Problem.** The code-review skill and rubric skip whitespace and formatting-only diffs, and doc-sync skips changes with no observable surface, but `commit-gate.sh` denies such a commit as unreviewed (and undocumented when the repo tracks docs). The agent then has to ask the user before a whitespace fix. Caught by `code-review-formatting-only` (D7) and reproduced by feeding the gate that case's staged diff.
+
+**Change.** In gate mode, allow a diff that is empty under `git diff --ignore-all-space --ignore-blank-lines`. Lockfiles and generated files, which the rubric also skips, need a path list and are out of scope here.
+
+**Acceptance.** A regression test in `tests/commit-gate.test.sh` (whitespace-only diff allowed, whitespace plus a code change still denied); `code-review-formatting-only` passes with the plugin.
 
 ## Done
 
