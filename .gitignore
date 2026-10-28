@@ -1,2 +1,4 @@
 # claude plugin eval output (scores, reports, mock recordings)
 evals/results/
+# cargo build output
+/target/

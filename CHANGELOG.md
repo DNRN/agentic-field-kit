@@ -14,6 +14,7 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 - Interactive menu when `install.sh` runs on a terminal without arguments.
 - `--project DIR`, `--global`, `--force`, `--dry-run`, `--yes`, `--interactive`.
 - CI runs the installer tests on Windows (Git Bash); `.gitattributes` keeps every checkout LF.
+- `installer/`: the Rust installer that replaces `install.sh` in 0.3.0 ([ADR 0009](docs/adr/0009-installer-in-rust.md), [plan](docs/plans/rust-installer.md)). Not released; so far it answers `--list` and `--check`, and CI checks its `--list` against state written by `install.sh` on Linux, macOS, and Windows.
 
 ### Changed
 

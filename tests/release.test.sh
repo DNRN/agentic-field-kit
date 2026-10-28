@@ -17,6 +17,9 @@ check "plugin.json has a semver version" grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' <<<
 check "CHANGELOG.md exists" [ -f "$CHANGELOG" ]
 check "CHANGELOG.md has an Unreleased section" grep -qxF '## [Unreleased]' "$CHANGELOG"
 check "CHANGELOG.md has a dated entry for $version" grep -qE "^## \[${version//./\\.}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$" "$CHANGELOG"
+# The installer binary ships the components, so its version is the release (ADR 0010).
+cargo_version="$(sed -n 's/^version = "\([^"]*\)".*/\1/p' "$ROOT/installer/Cargo.toml" | head -n 1)"
+check "installer/Cargo.toml version ($cargo_version) equals plugin.json ($version)" [ "$cargo_version" = "$version" ]
 
 [ "$fails" -eq 0 ] && echo "release: all passed" || echo "release: $fails failed"
 [ "$fails" -eq 0 ]

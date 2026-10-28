@@ -17,6 +17,20 @@ mkdir -p "$C"
 cp -R "$SRC/install.sh" "$SRC/catalog.tsv" "$SRC/skills" "$SRC/agents" "$SRC/hooks" "$SRC/.claude-plugin" "$C/"
 I="$C/install.sh"
 
+# With AGENTIC_TOOLKIT_BIN set, the Rust installer answers --list and --check
+# (docs/plans/rust-installer.md, R1), reading state that install.sh wrote.
+if [ -n "${AGENTIC_TOOLKIT_BIN:-}" ]; then
+  mv "$C/install.sh" "$C/install-bash.sh"
+  cat > "$C/install.sh" <<EOF
+#!/usr/bin/env bash
+here=\$(cd "\$(dirname "\$0")" && pwd)
+for a in "\$@"; do case "\$a" in --list|--check) exec "$AGENTIC_TOOLKIT_BIN" --source "\$here" "\$@" ;; esac; done
+exec "\$here/install-bash.sh" "\$@"
+EOF
+  chmod +x "$C/install.sh"
+  echo "(--list and --check answered by $AGENTIC_TOOLKIT_BIN)"
+fi
+
 TAB=$'\t'
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) WINDOWS=1 ;; *) WINDOWS=0 ;; esac
 default_form() { # path → it has the global default form: a copy on Windows, else a link
@@ -200,6 +214,24 @@ check "update --yes: removes a retired component" holds '[ ! -e "$P/.agents/skil
 cp "$TMP/catalog.orig" "$C/catalog.tsv"
 rm -f "$C/catalog.tsv.bak"
 cd "$TMP" || exit 1
+
+# ---- a component with CRLF content, nested folders, a non-ASCII name ----------
+cp "$C/catalog.tsv" "$TMP/catalog.orig"
+printf 'skill\tfixture-skill\tskills/fixture-skill\tall\t-\tFixture\n' >> "$C/catalog.tsv"
+mkdir -p "$C/skills/fixture-skill/references/deep"
+printf -- '---\r\nname: fixture-skill\r\ndescription: Use when testing hashes.\r\n---\r\nBody\r\n' > "$C/skills/fixture-skill/SKILL.md"
+printf 'deep\n' > "$C/skills/fixture-skill/references/deep/notes.txt"
+printf 'ü\n' > "$C/skills/fixture-skill/Ünïcode.md"
+P=$(project fixture)
+(cd "$P" && "$I" fixture-skill >/dev/null)
+check "fixture: a project copy lists as installed" [ "$(cd "$P" && st project fixture-skill)" = installed ]
+"$I" --global --mode copy fixture-skill >/dev/null
+check "fixture: a global copy lists as installed" [ "$(st global fixture-skill --global)" = installed ]
+printf 'changed\n' >> "$C/skills/fixture-skill/references/deep/notes.txt"
+check "fixture: a nested upstream change lists as outdated" [ "$(cd "$P" && st project fixture-skill)" = outdated ]
+"$I" --global --remove fixture-skill >/dev/null
+cp "$TMP/catalog.orig" "$C/catalog.tsv"
+rm -rf "$C/skills/fixture-skill"
 
 # ---- edits, hostile manifests, odd roots -------------------------------------
 P=$(project edits)
