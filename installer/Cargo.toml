@@ -14,6 +14,10 @@ build = "build.rs"
 name = "agentic-toolkit"
 path = "src/main.rs"
 
+# publish = false keeps it off crates.io; dist still releases the binary (ADR 0010).
+[package.metadata.dist]
+dist = true
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 dunce = "1"
