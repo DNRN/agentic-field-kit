@@ -46,8 +46,8 @@ jobs:
           cargo clippy --all-targets -- -D warnings
           cargo test
           cargo build --release
-      # The binary answers --list and --check; install.sh does the rest
-      # (docs/plans/rust-installer.md, R1). The tests create symlinks as
+      # The binary runs every command but the menu, which stays with install.sh
+      # until R3 (docs/plans/rust-installer.md). The tests create symlinks as
       # fixtures; without MSYS=winsymlinks:nativestrict, Git Bash's ln -s copies.
       - name: Catalog and installer tests against the binary
         env:
