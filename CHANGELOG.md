@@ -4,6 +4,10 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+### Changed
+
+- `adr-planning` briefs each Proposed ADR in a few lines (decision, strongest rejected alternative, costliest consequence, assumptions, path) instead of pasting it, and asks you to accept, change, or reject each one. It records the verdict in the ADR's Status: `Accepted`, or `Rejected` with the reason, keeping the file. It no longer implements a decision while it is Proposed, and it now also triggers when you give a verdict on a Proposed ADR.
+
 ## [0.2.0] - 2026-10-28
 
 ### Added
