@@ -37,18 +37,18 @@ fn truecolor() -> bool {
 
 /// Terminals known to answer the image-protocol query. ratatui-image's query
 /// leaves a thread reading stdin until the terminal answers, which would take
-/// keystrokes away from the UI in a terminal that never does.
+/// keystrokes away from the UI in a terminal that never does. `TERM` and
+/// `TERM_PROGRAM` only: variables like `KITTY_WINDOW_ID` leak into terminals
+/// started inside kitty (IDE terminals, `script`) that don't answer.
 fn answers_graphics_query() -> bool {
     let var = |k: &str| env::var(k).unwrap_or_default();
-    !var("KITTY_WINDOW_ID").is_empty()
-        || matches!(
-            var("TERM").as_str(),
-            "xterm-kitty" | "xterm-ghostty" | "foot" | "foot-extra"
-        )
-        || matches!(
-            var("TERM_PROGRAM").as_str(),
-            "iTerm.app" | "WezTerm" | "ghostty"
-        )
+    matches!(
+        var("TERM").as_str(),
+        "xterm-kitty" | "xterm-ghostty" | "foot" | "foot-extra"
+    ) || matches!(
+        var("TERM_PROGRAM").as_str(),
+        "iTerm.app" | "WezTerm" | "ghostty"
+    )
 }
 
 pub struct Logo {

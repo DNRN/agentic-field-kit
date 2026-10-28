@@ -337,25 +337,45 @@ impl App {
         self.marks.clear();
     }
 
+    /// The marked actions. An update of a component the install step already
+    /// writes is left out, so each write is planned, shown, and applied once.
     fn requests(&self) -> Vec<(Action, Vec<String>)> {
-        [Action::Install, Action::Update, Action::Remove]
-            .into_iter()
-            .map(|action| {
-                let want = match action {
-                    Action::Install => Mark::Install,
-                    Action::Update => Mark::Update,
-                    Action::Remove => Mark::Remove,
-                };
-                let names = self
-                    .marks
+        let marked = |want: Mark| -> Vec<String> {
+            self.marks
+                .iter()
+                .filter(|(_, m)| **m == want)
+                .map(|(n, _)| n.clone())
+                .collect()
+        };
+        let installs = marked(Mark::Install);
+        let mut updates = marked(Mark::Update);
+        if !installs.is_empty() {
+            let opts = self.scope_opts();
+            if let Ok(plan) = engine::plan_action(
+                &self.ctx,
+                &opts,
+                Action::Install,
+                self.scope,
+                &installs,
+                false,
+            ) {
+                let written: Vec<&str> = plan
+                    .steps
                     .iter()
-                    .filter(|(_, m)| **m == want)
-                    .map(|(n, _)| n.clone())
-                    .collect::<Vec<_>>();
-                (action, names)
-            })
-            .filter(|(_, names)| !names.is_empty())
-            .collect()
+                    .filter(|s| s.verb == engine::Verb::Write)
+                    .map(|s| s.name.as_str())
+                    .collect();
+                updates.retain(|n| !written.contains(&n.as_str()));
+            }
+        }
+        [
+            (Action::Install, installs),
+            (Action::Update, updates),
+            (Action::Remove, marked(Mark::Remove)),
+        ]
+        .into_iter()
+        .filter(|(_, names)| !names.is_empty())
+        .collect()
     }
 
     fn scope_opts(&self) -> Options {
@@ -891,8 +911,7 @@ mod tests {
         }
     }
 
-    fn app_with(f: &Fixture, dry_run: bool) -> App {
-        let source = Source::Embedded;
+    fn app_from(f: &Fixture, source: Source, dry_run: bool) -> App {
         let catalog = Catalog::parse(&source.catalog_text().unwrap());
         let ctx = Ctx {
             version: source.version(),
@@ -910,8 +929,60 @@ mod tests {
         App::new(ctx, opts, false, dry_run, None)
     }
 
+    fn app_with(f: &Fixture, dry_run: bool) -> App {
+        app_from(f, Source::Embedded, dry_run)
+    }
+
     fn app(f: &Fixture) -> App {
         app_with(f, false)
+    }
+
+    fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
+        if from.is_dir() {
+            fs::create_dir_all(to).unwrap();
+            for entry in fs::read_dir(from).unwrap().flatten() {
+                copy_tree(&entry.path(), &to.join(entry.file_name()));
+            }
+        } else {
+            fs::create_dir_all(to.parent().unwrap()).unwrap();
+            fs::copy(from, to).unwrap();
+        }
+    }
+
+    /// A private toolkit tree, so a test can change a component "upstream".
+    fn toolkit(f: &Fixture) -> PathBuf {
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap();
+        let dir = f.home.parent().unwrap().join("toolkit");
+        for p in ["catalog.tsv", "skills", "agents", "hooks", ".claude-plugin"] {
+            copy_tree(&repo.join(p), &dir.join(p));
+        }
+        dir
+    }
+
+    #[test]
+    fn an_update_that_the_install_already_does_is_planned_once() {
+        let f = fixture();
+        let dir = toolkit(&f);
+        let mut app = app_from(&f, Source::Dir(dir.clone()), false);
+        let (review, reviewer) = (row(&app, "code-review"), row(&app, "code-reviewer"));
+        press(&mut app, &format!("{review}\ny\n"));
+        let skill = dir.join("skills/code-review/SKILL.md");
+        let text = fs::read_to_string(&skill).unwrap() + "\nupstream change\n";
+        fs::write(&skill, text).unwrap();
+        app.refresh();
+        assert_eq!(app.rows[review - 1].project, "outdated");
+        press(&mut app, &format!("u{reviewer}\n"));
+        let updates = review_lines(&app)
+            .iter()
+            .filter(|l| l.contains("update  .agents/skills/code-review"))
+            .count();
+        assert_eq!(updates, 1, "{:?}", review_lines(&app));
+        press(&mut app, "y");
+        assert!(!app.failed, "{:?}", app.log);
+        assert_eq!(app.rows[review - 1].project, "installed");
+        assert!(f.project.join(".claude/agents/code-reviewer.md").is_file());
     }
 
     /// Each key after a draw, as the real loop does, on a terminal of `size`.
