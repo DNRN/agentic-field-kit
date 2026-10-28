@@ -9,39 +9,69 @@ Why this repo starts with an [ADR skill](docs/why-adrs.md): tests verify behavio
 | Component | Claude Code | Codex | Gemini CLI | OpenCode | Cursor | omp |
 | --- | --- | --- | --- | --- | --- | --- |
 | [`skills/`](skills/) — SKILL.md folders | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [`agents/`](agents/) · [`commands/`](commands/) · [`hooks/`](hooks/) · [`output-styles/`](output-styles/) | ✓ (plugin) | adapt | adapt | adapt | adapt | adapt |
+| [`agents/`](agents/) · [`commands/`](commands/) · [`hooks/`](hooks/) · [`output-styles/`](output-styles/) | ✓ (plugin; agents also via `install.sh`) | adapt | adapt | adapt | adapt | adapt |
 | [`rules/`](rules/) · [`prompts/`](prompts/) · [`policies/`](policies/) | copy | copy | copy | copy | copy | copy |
 
 Skills follow the [Agent Skills](https://agentskills.io) open standard — identical folders load natively in every harness above. The other component categories currently auto-load only via the Claude Code plugin; adapters for other harnesses are welcome.
 
-## Install skills
+## Install
 
-Pick the row for your setup. Each harness was checked for what it reads and how it handles a skill found twice ([D8](docs/plans/design-improvements.md#d8-duplicate-skill-loading--done)).
-
-| You use | Install |
-| --- | --- |
-| Codex, Gemini CLI, OpenCode, Cursor, omp | `./install.sh` |
-| Claude Code with the [plugin](#claude-code-full-bundle-also-loads-agents-commands-hooks-styles) | The plugin; add `./install.sh` only for other harnesses. Never `--harness claude`: a personal copy of a plugin skill hides the plugin's `agentic-toolkit:*` name, which the commit gate tells the agent to run |
-| Claude Code without the plugin | `./install.sh --harness claude`, plus `--harness agents` for other harnesses |
+Install only the components you need, into the project that needs them. The installer copies them into the repository; commit them, and every teammate and every harness gets the same version.
 
 ```bash
-./install.sh                              # symlink into ~/.agents/skills (the default)
-./install.sh --harness claude --mode copy # another target, or copies instead of links
-./install.sh --check                      # validate skills against portability rules
-./install.sh --remove                     # undo, in every target
+git clone https://github.com/DNRN/agentic-toolkit ~/src/agentic-toolkit
+cd ~/code/your-project
+~/src/agentic-toolkit/install.sh                # menu: what can be installed, what is installed
+~/src/agentic-toolkit/install.sh code-reviewer  # or name components; what they require comes along
+git add .agents .claude && git commit -m "Add agentic-toolkit components"
 ```
 
-| Target | Read by |
+| Command | Effect |
 | --- | --- |
-| `~/.agents/skills/` | Codex, Gemini CLI, OpenCode, Cursor, omp |
-| `~/.claude/skills/` | Claude Code; also OpenCode, and Cursor with third-party extensibility on |
-| `~/.omp/agent/skills/` | omp; needed only when its `~/.agents` provider is turned off |
+| `install.sh` | Menu (on a terminal): numbers mark components to install or remove, `u` marks updates, `g` switches to the global scope; shows the plan and asks before changing anything |
+| `install.sh --list` | Status of every component, in this project and globally |
+| `install.sh NAME…` · `--all` | Install components and what they require |
+| `install.sh --update [NAME…]` | After `git pull` in the clone: refresh what changed upstream, restore deleted copies, add new requirements |
+| `install.sh --remove [NAME…]` | Remove what the installer installed, and requirements nothing else needs |
+| `--project DIR` · `--global` | Scope: the git root of the working directory by default |
+| `--force` · `--dry-run` · `--yes` | Also overwrite or remove locally edited copies · print the plan only · don't ask |
+| `install.sh --check` | Validate skills against the Agent Skills portability rules |
 
-- A harness that reads one skill from two targets lists it once; OpenCode logs a warning. Codex is the exception: it lists a same-named skill twice unless both paths resolve to the same folder.
+Where a project install puts things ([ADR 0006](docs/adr/0006-project-scope-install-default.md)):
+
+| Path | Read by |
+| --- | --- |
+| `.agents/skills/<name>/` | Codex, Gemini CLI, OpenCode, Cursor, omp |
+| `.claude/skills/<name>/` | Claude Code. Left out when the project's `.claude/settings.json` enables the plugin, which already provides the skills |
+| `.claude/agents/<name>.md` | Claude Code subagents; same condition |
+| `.agents/agentic-toolkit.tsv` | The installer: what it installed, why, and a content hash of each ([ADR 0008](docs/adr/0008-project-install-manifest.md)) |
+
+**Updating.** Components have no version numbers of their own. `--list` compares each copy with the hash recorded at install time and with the clone: `outdated` (changed upstream), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it). The installer never touches a file it didn't install (`foreign`).
+
+Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#evidence)):
+
+- Gemini CLI loads project skills only in a [trusted folder](https://geminicli.com/docs/cli/trusted-folders/). Gemini CLI and Cursor find them only when started at the repository root.
+- A skill installed both in the project and globally: Codex lists it twice, Claude Code and Cursor use the global copy. `--list` flags it, and a project install offers to remove the global copy.
+- With the plugin enabled at user scope, Claude Code lists a project `code-review` next to the plugin's `agentic-toolkit:code-review`. Enable the plugin for the project instead, or install only the plugin.
+- `commit-gate` ships only with the plugin until the portable gate ([roadmap phase 1](docs/plans/roadmap.md#phase-1-enforce-existing-themes)) lands.
+
+### Global install
+
+For a skill you want in every repository, such as `adr-planning`: `install.sh --global NAME`. Global installs are symlinks into the clone, so `git pull` updates them; `--mode copy` makes copies, and `--update` keeps each install's form.
+
+| `--harness` | Target | Read by |
+| --- | --- | --- |
+| `agents` (default) | `~/.agents/skills/` | Codex, Gemini CLI, OpenCode, Cursor, omp |
+| `claude` | `~/.claude/skills/` | Claude Code; also OpenCode, and Cursor with third-party extensibility on. Only without the plugin: a personal symlink to the plugin's skill folder hides the plugin's `agentic-toolkit:*` name, which the commit gate tells the agent to run, and a personal copy lists every skill twice |
+| `omp` | `~/.omp/agent/skills/` | omp; needed only when its `~/.agents` provider is turned off |
+
 - Codex names a *symlinked* skill `agentic-toolkit:<name>`, because its real path sits inside this plugin repo. `--mode copy` keeps the bare name.
 - In Claude Code, a personal `code-review` replaces the built-in `/code-review`.
+- `install.sh --global --remove` also removes the links and copies made by the 0.1.0 installer.
 
-Symlinks stay live: `git pull` in this repo updates every harness at once. Per-project pinning: git submodule or sparse checkout, then `--mode copy` into the repo's `.agents/skills/`.
+### Windows
+
+Run the installer from Git Bash or WSL. Project installs contain no symlinks, so a Windows checkout works without `core.symlinks`. Global installs are copies by default on Windows (`ln -s` in Git Bash copies without saying so). From WSL, `--global` reaches only the Linux-side harnesses.
 
 ## Claude Code full bundle (also loads agents, commands, hooks, styles)
 
@@ -56,8 +86,8 @@ Symlinks stay live: `git pull` in this repo updates every harness at once. Per-p
 
 | Directory | Contents | How it loads |
 | --- | --- | --- |
-| [`skills/`](skills/) | SKILL.md folders, auto-discovered when relevant | Auto, every harness |
-| [`agents/`](agents/) | Subagent definitions (`.md`) | Plugin (Claude Code) |
+| [`skills/`](skills/) | SKILL.md folders, auto-discovered when relevant | Auto, every harness; [`install.sh`](#install) or the plugin |
+| [`agents/`](agents/) | Subagent definitions (`.md`) | Plugin, or `install.sh` into a project (Claude Code) |
 | [`commands/`](commands/) | Slash commands (`.md`) | Plugin (Claude Code) |
 | [`hooks/`](hooks/) | `hooks/hooks.json` + scripts, event-triggered | Plugin (Claude Code) |
 | [`output-styles/`](output-styles/) | Output style / persona definitions | Plugin (Claude Code) |
@@ -66,7 +96,8 @@ Symlinks stay live: `git pull` in this repo updates every harness at once. Per-p
 | [`prompts/`](prompts/) | Plan / spec / review templates | Referenced by skills & commands |
 | [`policies/`](policies/) | Permission allow/deny presets | Copy into project settings |
 | [`evals/`](evals/) | Golden tasks per component in `claude plugin eval` format, scored against a no-plugin baseline | [`claude plugin eval .`](evals/README.md#run) |
-| [`tests/`](tests/) | Deterministic regression tests for hooks, `install.sh`, and release metadata | `tests/run.sh` |
+| [`tests/`](tests/) | Deterministic regression tests for hooks, `install.sh`, `catalog.tsv`, and release metadata | `tests/run.sh` |
+| `catalog.tsv` | Every installable component: kind, path, harnesses, requirements, one-line summary ([ADR 0007](docs/adr/0007-component-catalog.md)) | Read by `install.sh` |
 | [`docs/`](docs/) | Rationale essays, [ADRs](docs/adr/), [plans](docs/plans/) | Read |
 
 ## Conventions
@@ -76,7 +107,8 @@ Symlinks stay live: `git pull` in this repo updates every harness at once. Per-p
 - Every behavioral component ships with eval cases under `evals/<component>/`, including a negative case.
 - No secrets, no machine-specific paths; scripts read relative to their component folder.
 - Agents, commands, and output styles are registered explicitly in `.claude-plugin/plugin.json` (the folder scan would also load each folder's README); `tests/run.sh` fails on an unregistered file.
-- Validate before pushing: `./install.sh --check`, `tests/run.sh`, and `claude plugin validate .` if you touched `.claude-plugin/`. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these plus shellcheck, an internal link and anchor check, and mermaid rendering on every push to `main` and every PR. CI does not run the [eval suite](evals/README.md) (it needs model credentials and costs money): run it when a skill, agent, or hook changes.
+- Every skill, agent, and hook script has a row in `catalog.tsv`, with `requires` naming what it can't work without; `tests/run.sh` fails on a component without a row.
+- Validate before pushing: `./install.sh --check`, `tests/run.sh`, and `claude plugin validate .` if you touched `.claude-plugin/`. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these plus shellcheck, the installer tests on Windows (Git Bash), an internal link and anchor check, and mermaid rendering on every push to `main` and every PR. CI does not run the [eval suite](evals/README.md) (it needs model credentials and costs money): run it when a skill, agent, or hook changes.
 
 ## Releasing
 

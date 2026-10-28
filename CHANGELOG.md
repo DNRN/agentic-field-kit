@@ -4,6 +4,23 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+### Added
+
+- `catalog.tsv` lists every installable component with its kind, harnesses, requirements, and a summary ([ADR 0007](docs/adr/0007-component-catalog.md)). `tests/catalog.test.sh` fails on a component without a row.
+- `install.sh` installs single components and what they require, into a project ([ADR 0006](docs/adr/0006-project-scope-install-default.md)): copies in `.agents/skills`, plus `.claude/skills` and `.claude/agents` for Claude Code unless the project enables the plugin. `code-reviewer` and `doc-auditor` can now be installed without the plugin.
+- A manifest per scope, `.agents/agentic-toolkit.tsv`, records what was installed, why, and a content hash ([ADR 0008](docs/adr/0008-project-install-manifest.md)).
+- `install.sh --list` shows each component's status in the project and globally, and flags a skill installed in both.
+- `install.sh --update` refreshes what changed upstream, restores deleted copies, installs new requirements, and asks before removing retired components. It leaves locally edited copies alone without `--force`; so does `--remove`.
+- Interactive menu when `install.sh` runs on a terminal without arguments.
+- `--project DIR`, `--global`, `--force`, `--dry-run`, `--yes`, `--interactive`.
+- CI runs the installer tests on Windows (Git Bash); `.gitattributes` keeps every checkout LF.
+
+### Changed
+
+- **Breaking:** `install.sh` installs into the project (the git root of the working directory) by default; the old behavior is `install.sh --global --all`. It refuses to run in its own clone, and without a terminal it needs component names or `--all`. `--harness` and `--mode` require `--global`.
+- On Windows, `--global` copies by default instead of linking.
+- Corrected the 0.1.0 install advice: in Claude Code, only a personal *symlink* to the plugin's skill folder hides the plugin's `agentic-toolkit:*` skill; a personal copy is listed next to it.
+
 ## [0.1.0] - 2026-10-23
 
 First release.

@@ -104,7 +104,7 @@ Found while running: inside eval runs `git` is masked (`permission denied`, exit
 
 | Harness | Reads | Same skill in two places |
 | --- | --- | --- |
-| Claude Code 2.1.288 (`system/init` skill list) | `~/.claude/skills`, not `~/.agents/skills` | Personal + plugin, identical content (symlink or marketplace copy): the plugin's `agentic-toolkit:<skill>` disappears; `/agentic-toolkit:code-review` then answers "isn't installed in this session". Different content: both load. A personal `code-review` replaces the built-in `/code-review` |
+| Claude Code 2.1.288 (`system/init` skill list) | `~/.claude/skills`, not `~/.agents/skills` | Personal symlink to the plugin's own skill folder: the plugin's `agentic-toolkit:<skill>` disappears; `/agentic-toolkit:code-review` then answers "isn't installed in this session". A personal copy, even with identical content, or different content: both load (corrected 2026-10-23, see [selective install](selective-install.md#evidence)). A personal `code-review` replaces the built-in `/code-review` |
 | omp 18.12.5 (`skill://` listing) | `~/.omp/agent/skills` and `~/.agents/skills` | Same folder or identical copies: listed once. Different content: the `~/.omp` copy keeps the name, the other becomes `agents/<name>` |
 | Codex 0.164.0 (app-server `skills/list`) | `~/.agents/skills`, `~/.codex/skills` | Listed twice unless both resolve to the same folder. A symlink into this repo is named `agentic-toolkit:<name>` (real path under `.claude-plugin/`); a copy keeps the bare name |
 | Gemini CLI 0.65.0 (`gemini skills list`) | `~/.agents/skills`, `~/.gemini/skills` | Listed once, `~/.agents` wins, "Skill conflict detected" on stderr |

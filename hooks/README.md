@@ -10,6 +10,7 @@ Least portable category: hook event models and config formats differ per harness
 - Reference bundled scripts via `"${CLAUDE_PLUGIN_ROOT}"/hooks/scripts/<script>.sh` — never absolute local paths.
 - Hooks must be idempotent and safe when the tool state is unexpected; they run on every matching event.
 - Every hook ships with regression tests in `tests/<script>.test.sh` (JSON on stdin, decision on stdout); run `tests/run.sh`.
+- Every hook script has a row in [`catalog.tsv`](../catalog.tsv) (`harnesses` is `plugin` while it ships only with the Claude Code plugin); `tests/run.sh` fails without one.
 
 ## commit-gate.sh
 

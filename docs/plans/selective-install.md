@@ -49,7 +49,7 @@ Claude Code plugin findings from the 2026-10-23 run:
 | Project (default) | copy in `.agents/skills/<name>` | second copy in `.claude/skills/<name>`; agents copied to `.claude/agents/<name>.md` | nothing extra: the plugin provides skills and agents | `.agents/agentic-toolkit.tsv`, committed |
 | Global (`--global`) | symlink in `~/.agents/skills/<name>` (copy on Windows) | `~/.claude/skills/<name>` (`--harness claude`) | nothing extra | `~/.agents/agentic-toolkit.tsv` |
 
-"Enabled for the project" means the project's committed `.claude/settings.json` enables `agentic-toolkit@…`, so the decision is the same for every teammate. A plugin enabled only at user scope on one machine doesn't change what gets committed; `--list` notes that Claude Code then lists both `code-review` and `agentic-toolkit:code-review`.
+"Enabled for the project" means the project's committed `.claude/settings.json` enables `agentic-toolkit@…`, so the decision is the same for every teammate. A plugin enabled only at user scope on one machine doesn't change what gets committed; Claude Code then lists both `code-review` and `agentic-toolkit:code-review`. `--list` shows where the plugin is enabled in its header, and the README says what that means.
 
 ## User experience
 
@@ -58,23 +58,32 @@ Run from inside the project, with no arguments, on a terminal:
 ```
 $ cd ~/code/shop && ~/src/agentic-toolkit/install.sh
 agentic-toolkit 0.2.0 → project /home/u/code/shop
-Harnesses found: claude, codex, opencode · Claude Code plugin: not enabled for this project
+Harnesses found: claude, codex, opencode
+Claude Code plugin: not enabled
 
-    #  component      kind   project    global     notes
-    1  adr-planning   skill  installed  -
-    2  code-review    skill  outdated   linked     ! in both scopes
-    3  doc-sync       skill  -          -
-    4  code-reviewer  agent  -          n/a        Claude Code; needs code-review
-    5  doc-auditor    agent  -          n/a        Claude Code; needs doc-sync
-    6  commit-gate    hook   n/a        n/a        plugin only (roadmap phase 1)
+   #  component      kind   project   global    summary
+   1  adr-planning   skill  installed -         Record design decisions as ADRs
+   2  code-review    skill  outdated  linked    Fresh-eyes review before commit
+      ! in both scopes
+   3  doc-sync       skill  -         -         Keep docs true to the code
+   4  code-reviewer  agent  -         n/a       Read-only code review subagent
+      Claude Code only; needs code-review
+   5  doc-auditor    agent  -         n/a       Read-only doc audit subagent
+      Claude Code only; needs doc-sync
+   6  commit-gate    hook   n/a       n/a       Ask before unreviewed commits
+      plugin only until roadmap phase 1; needs code-review, doc-sync
 
-Numbers mark install/remove · u update · g global scope · enter review · q quit
+! in both scopes: Codex lists it twice; Claude Code and Cursor use the global copy.
+Scope: project (/home/u/code/shop)
+Number: mark + install / - remove · u: mark updates (~) · g: other scope
+Enter: review and apply · q: quit
 > 3 4
+(table again, rows 3 and 4 marked +)
 > 
   copy    .agents/skills/doc-sync
   copy    .claude/skills/doc-sync
+  ok      code-review: already installed
   copy    .claude/agents/code-reviewer.md
-  skip    code-review (already installed)
 Apply? [y/N]
 ```
 
@@ -112,6 +121,8 @@ Without a terminal, and with neither names nor `--all`, the installer exits with
 | `plugin` | provided by the Claude Code plugin enabled for this scope | `enabledPlugins` in `.claude/settings.json` (project) or `~/.claude/settings.json` (global) |
 | `n/a` | the component doesn't support this scope | catalog `harnesses` column |
 
+When several apply, the first wins: `modified`, `retired`, `missing`, `dangling`. An edit anywhere in a component therefore always needs `--force`.
+
 Global installs made before the manifest still count as ours: symlinks into this clone (`linked`), and copies with the old `.agentic-toolkit-install` marker (`installed` when identical to the source, `modified` otherwise).
 
 ### Updates
@@ -132,14 +143,14 @@ Components have no version numbers of their own (ADR 0008).
 
 | # | Item | Depends on | ADR | Status |
 | --- | --- | --- | --- | --- |
-| S0 | Correct D8: only a personal symlink hides the plugin skill | — | — | open |
-| S1 | Catalog and `--list` (read-only) | — | [0007](../adr/0007-component-catalog.md) | open |
-| S2 | Selective install, update, and remove, project scope by default | S1 | [0006](../adr/0006-project-scope-install-default.md), [0008](../adr/0008-project-install-manifest.md) | open |
-| SW | Windows | S2 | [0006](../adr/0006-project-scope-install-default.md) | open |
-| S3 | Interactive menu | S2 | — | open |
-| S4 | Claude Code agents in the project | S2 | — | open |
+| S0 | Correct D8: only a personal symlink hides the plugin skill | — | — | done |
+| S1 | Catalog and `--list` (read-only) | — | [0007](../adr/0007-component-catalog.md) | done |
+| S2 | Selective install, update, and remove, project scope by default | S1 | [0006](../adr/0006-project-scope-install-default.md), [0008](../adr/0008-project-install-manifest.md) | done |
+| SW | Windows | S2 | [0006](../adr/0006-project-scope-install-default.md) | done; the Windows CI job has not run yet |
+| S3 | Interactive menu | S2 | — | done |
+| S4 | Claude Code agents in the project | S2 | — | done |
 | S5 | `commit-gate` outside the plugin | S4, roadmap phase 1 | new, if the gate's skill names become configurable | deferred |
-| S6 | Docs and release | S2–S4, SW | — | open |
+| S6 | Docs and release | S2–S4, SW | — | docs done; release 0.2.0 and ADR acceptance open |
 
 ## S0. Correct the D8 finding
 
@@ -166,7 +177,8 @@ Components have no version numbers of their own (ADR 0008).
 
 - Positional names, `--all`, `--project`, `--global`, `--update`, `--remove`, `--force`, `--dry-run`, and `--yes`.
 - `requires` is resolved before anything is written; removing a component that another installed component requires is refused unless both are named.
-- Without `--project`, the installer refuses a directory outside git unless `--global` is given, and refuses the toolkit clone as a project.
+- Without `--project`, the installer refuses a directory outside git unless `--global` is given. It refuses the toolkit clone, and a project root that is `$HOME` (that is the global scope).
+- Manifest paths count only if they are one of the component's own folders or files; anything else in a committed manifest is ignored, never deleted.
 - Project scope writes the copies of the [target layout](#target-layout) and the manifest (ADR 0008).
 - `--remove NAME` also offers to remove dependencies that were pulled in for it and that nothing else needs.
 - After a project install, a both-scopes duplicate prompts "remove the global copy?" (with `--yes`, it only warns).

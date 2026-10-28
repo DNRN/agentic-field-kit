@@ -23,7 +23,7 @@ During planning, someone proposed going further and supporting project installs 
 
 We will make the current project the default install scope:
 
-- The project is the git root of the working directory, or `--project DIR`, which may be any directory. Without `--project`, the installer refuses to run outside a git repository unless `--global` is given. It refuses to treat the toolkit's own clone as the project.
+- The project is the git root of the working directory, or `--project DIR`, which may be any directory. Without `--project`, the installer refuses to run outside a git repository unless `--global` is given. It refuses to treat the toolkit's own clone, or `$HOME` (the global scope), as the project.
 - Project installs are **copies**, meant to be committed: `<repo>/.agents/skills/<name>` for every harness, and a second copy in `<repo>/.claude/skills/<name>` for Claude Code. The installer leaves the `.claude` copy out when the project's `.claude/settings.json` enables the agentic-toolkit plugin, so the skill isn't listed twice.
 - The project's manifest ([ADR 0008](0008-project-install-manifest.md)) records each copy and its content hash, so the installer can tell an outdated copy from a locally edited one and detect drift between the two copies.
 - Global install (`--global`) stays available. It keeps today's targets and its symlink default, except on Windows (Git Bash, MSYS, Cygwin), where `ln -s` makes a copy without telling you, so copy is the default there.
