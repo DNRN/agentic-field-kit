@@ -83,7 +83,7 @@ Interactive behaviour moves from the piped-stdin menu tests to Rust tests on Rat
 | # | Item | Depends on | ADR | Status |
 | --- | --- | --- | --- | --- |
 | R0 | This plan; ADRs 0009–0011 accepted | — | 0009–0011 | done |
-| R1 | Workspace, CI, `--check` and `--list` from embedded or `--source` | R0 | 0009, 0010 | done locally on Linux; macOS and Windows wait for CI |
+| R1 | Workspace, CI, `--check` and `--list` from embedded or `--source` | R0 | 0009, 0010 | done (CI green on Linux, macOS, Windows, 2026-10-28) |
 | R2 | Engine port: install, update, remove at parity | R1 | 0009 | open |
 | R3 | Terminal UI | R2 | 0009 | open |
 | R4 | Entropy Fox brand | R3 | 0011 | open |
