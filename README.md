@@ -97,7 +97,7 @@ Run the installer from Git Bash or WSL. Project installs contain no symlinks, so
 | [`policies/`](policies/) | Permission allow/deny presets | Copy into project settings |
 | [`evals/`](evals/) | Golden tasks per component in `claude plugin eval` format, scored against a no-plugin baseline | [`claude plugin eval .`](evals/README.md#run) |
 | [`tests/`](tests/) | Deterministic regression tests for hooks, `install.sh`, `catalog.tsv`, and release metadata | `tests/run.sh` |
-| [`installer/`](installer/) | The Rust installer `agentic-toolkit`, which replaces `install.sh` in 0.3.0 ([plan](docs/plans/rust-installer.md)); so far `--list` and `--check` | `cargo build --release` |
+| [`installer/`](installer/) | The Rust installer `agentic-toolkit`, which replaces `install.sh` in 0.3.0 ([plan](docs/plans/rust-installer.md)); everything but the menu so far | `cargo build --release` |
 | `catalog.tsv` | Every installable component: kind, path, harnesses, requirements, one-line summary ([ADR 0007](docs/adr/0007-component-catalog.md)) | Read by `install.sh` |
 | [`docs/`](docs/) | Rationale essays, [ADRs](docs/adr/), [plans](docs/plans/) | Read |
 

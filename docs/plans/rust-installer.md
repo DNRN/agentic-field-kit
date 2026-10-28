@@ -84,7 +84,7 @@ Interactive behaviour moves from the piped-stdin menu tests to Rust tests on Rat
 | --- | --- | --- | --- | --- |
 | R0 | This plan; ADRs 0009–0011 accepted | — | 0009–0011 | done |
 | R1 | Workspace, CI, `--check` and `--list` from embedded or `--source` | R0 | 0009, 0010 | done (CI green on Linux, macOS, Windows, 2026-10-28) |
-| R2 | Engine port: install, update, remove at parity | R1 | 0009 | open |
+| R2 | Engine port: install, update, remove at parity | R1 | 0009 | done locally on Linux; macOS and Windows wait for CI |
 | R3 | Terminal UI | R2 | 0009 | open |
 | R4 | Entropy Fox brand | R3 | 0011 | open |
 | R5 | Releases with dist | R2 | 0010 | open |
@@ -109,6 +109,8 @@ Before R1: merge PR #1 (done 2026-10-28) and release 0.2.0 (bash), so users get 
 ## R2. Engine port
 
 **Change.** Install, `--all`, `--update`, `--remove`, `--project`, `--global`, `--harness`, `--mode`, `--force`, `--dry-run`, `--yes`; legacy installs; the both-scopes warning and prompt; the commit hint. Error messages and plan lines match `install.sh` word for word where the suite checks them.
+
+Global symlinks need a folder to point into, and built-in components (ADR 0010) have none: without `--source`, global installs are copies and `--mode symlink` is refused. A global link that `install.sh` recorded (hash `-`) is restored as a copy when `--update` runs without `--source`. Copies keep files' executable bits, so a skill's scripts stay runnable.
 
 **Acceptance.**
 

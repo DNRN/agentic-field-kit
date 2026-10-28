@@ -34,19 +34,31 @@ fn main() {
     files.sort();
     files.dedup();
 
-    let mut out = String::from("pub static FILES: &[(&str, &[u8])] = &[\n");
+    let mut out = String::from("pub static FILES: &[(&str, &[u8], bool)] = &[\n");
     for rel in &files {
         let abs = repo.join(rel);
         writeln!(
             out,
-            "    ({rel:?}, include_bytes!({:?})),",
-            abs.to_str().unwrap()
+            "    ({rel:?}, include_bytes!({:?}), {}),",
+            abs.to_str().unwrap(),
+            executable(&abs)
         )
         .unwrap();
     }
     out.push_str("];\n");
     let dest = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("embedded.rs");
     fs::write(dest, out).unwrap();
+}
+
+#[cfg(unix)]
+fn executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    fs::metadata(path).unwrap().permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn executable(_: &Path) -> bool {
+    false
 }
 
 /// Regular files under `path` (or `path` itself), as `/`-separated paths

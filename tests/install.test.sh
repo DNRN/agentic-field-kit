@@ -17,18 +17,18 @@ mkdir -p "$C"
 cp -R "$SRC/install.sh" "$SRC/catalog.tsv" "$SRC/skills" "$SRC/agents" "$SRC/hooks" "$SRC/.claude-plugin" "$C/"
 I="$C/install.sh"
 
-# With AGENTIC_TOOLKIT_BIN set, the Rust installer answers --list and --check
-# (docs/plans/rust-installer.md, R1), reading state that install.sh wrote.
+# With AGENTIC_TOOLKIT_BIN set, the Rust installer runs every command except
+# the menu (docs/plans/rust-installer.md, R2); install.sh keeps the menu until R3.
 if [ -n "${AGENTIC_TOOLKIT_BIN:-}" ]; then
   mv "$C/install.sh" "$C/install-bash.sh"
   cat > "$C/install.sh" <<EOF
 #!/usr/bin/env bash
 here=\$(cd "\$(dirname "\$0")" && pwd)
-for a in "\$@"; do case "\$a" in --list|--check) exec "$AGENTIC_TOOLKIT_BIN" --source "\$here" "\$@" ;; esac; done
-exec "\$here/install-bash.sh" "\$@"
+for a in "\$@"; do [ "\$a" = --interactive ] && exec "\$here/install-bash.sh" "\$@"; done
+exec "$AGENTIC_TOOLKIT_BIN" --source "\$here" "\$@"
 EOF
   chmod +x "$C/install.sh"
-  echo "(--list and --check answered by $AGENTIC_TOOLKIT_BIN)"
+  echo "(every command but the menu run by $AGENTIC_TOOLKIT_BIN)"
 fi
 
 TAB=$'\t'
@@ -321,6 +321,23 @@ check "both scopes: --list warns" bash -c "cd '$P' && '$I' --list | grep -q '! i
 out=$(cd "$P" && "$I" code-review doc-sync </dev/null 2>&1)
 check "both scopes: install warns" grep -q "also installed globally" <<<"$out"
 "$I" --global --remove >/dev/null
+
+# ---- a project installed by install.sh, then managed by the binary -------------
+if [ -n "${AGENTIC_TOOLKIT_BIN:-}" ]; then
+  P=$(project upgrade)
+  (cd "$P" && "$C/install-bash.sh" code-reviewer adr-planning >/dev/null)
+  "$C/install-bash.sh" --global --mode copy doc-sync >/dev/null
+  cp "$P/.agents/agentic-toolkit.tsv" "$TMP/upgrade.before"
+  cp "$HOME/.agents/agentic-toolkit.tsv" "$TMP/upgrade.global"
+  out=$(cd "$P" && "$I" --update)
+  check "upgrade: the binary finds nothing to update in an install.sh project" holds 'grep -q "^  ok      code-reviewer: up to date$" <<<"$out" && ! grep -qvE "^  ok      " <<<"$out"'
+  check "upgrade: and leaves its manifest byte for byte" cmp -s "$P/.agents/agentic-toolkit.tsv" "$TMP/upgrade.before"
+  out=$("$I" --global --update)
+  check "upgrade: nor in an install.sh global copy" holds 'grep -q "^  ok      doc-sync: up to date$" <<<"$out" && ! grep -qvE "^  ok      " <<<"$out"'
+  check "upgrade: and leaves the global manifest byte for byte" cmp -s "$HOME/.agents/agentic-toolkit.tsv" "$TMP/upgrade.global"
+  "$I" --global --remove >/dev/null
+  cd "$TMP" || exit 1
+fi
 
 # ---- interactive menu ----------------------------------------------------------
 P=$(project menu)
