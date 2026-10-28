@@ -4,7 +4,7 @@ Date: 2026-10-23
 
 ## Status
 
-Accepted
+Accepted. The consequence "the installer is bash; on Windows it runs in Git Bash or WSL" is superseded by [0009](0009-installer-in-rust.md): the installer is a native binary.
 
 Plan: [selective install](../plans/selective-install.md). Related: [ADR 0007](0007-component-catalog.md) (catalog), [ADR 0008](0008-project-install-manifest.md) (manifest).
 

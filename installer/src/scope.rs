@@ -13,7 +13,7 @@ pub enum Scope {
     Global,
 }
 
-/// The home directory as install.sh sees it: `$HOME`, else `%USERPROFILE%`.
+/// The home directory: `$HOME`, else `%USERPROFILE%`.
 pub fn home() -> PathBuf {
     env::var_os("HOME")
         .filter(|h| !h.is_empty())
@@ -26,6 +26,27 @@ fn real(path: &Path) -> Option<PathBuf> {
     dunce::canonicalize(path).ok()
 }
 
+/// `path` with `.` dropped and each `..` removing the component before it,
+/// without following links: what bash's logical `cd DIR && pwd` gives.
+pub fn normalize(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for c in path.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if out.file_name().is_some() {
+                    out.pop();
+                } else if !out.has_root() {
+                    out.push("..");
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
 /// The nearest folder at or above `dir` with a `.git` entry (folder or file).
 fn git_root(dir: &Path) -> Option<PathBuf> {
     dir.ancestors()
@@ -35,7 +56,7 @@ fn git_root(dir: &Path) -> Option<PathBuf> {
 
 /// A folder that looks like an agentic-toolkit tree: a catalog and a plugin
 /// manifest named agentic-toolkit.
-fn is_toolkit_tree(dir: &Path) -> bool {
+pub fn is_toolkit_tree(dir: &Path) -> bool {
     dir.join("catalog.tsv").is_file()
         && fs::read_to_string(dir.join(".claude-plugin/plugin.json"))
             .ok()
@@ -43,7 +64,7 @@ fn is_toolkit_tree(dir: &Path) -> bool {
             .is_some_and(|n| n == "agentic-toolkit")
 }
 
-/// The project root, or why there is none (the messages install.sh prints).
+/// The project root, or why there is none.
 pub fn project(project_arg: Option<&Path>, source: &Source) -> Result<PathBuf, String> {
     let root = match project_arg {
         Some(dir) => real(dir)
@@ -164,5 +185,20 @@ mod tests {
             git_root(&tmp.path().join("a/b")).as_deref(),
             Some(tmp.path())
         );
+    }
+}
+
+#[cfg(test)]
+mod normalize_tests {
+    use super::*;
+
+    #[test]
+    fn resolves_dots_lexically() {
+        assert_eq!(
+            normalize(Path::new("/a/b/../../c/./d")),
+            PathBuf::from("/c/d")
+        );
+        assert_eq!(normalize(Path::new("/..")), PathBuf::from("/"));
+        assert_eq!(normalize(Path::new("../x")), PathBuf::from("../x"));
     }
 }

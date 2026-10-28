@@ -1,5 +1,4 @@
-//! `--check`: every skill against the Agent Skills portability rules, as
-//! `install.sh --check` checks them.
+//! `--check`: every skill against the Agent Skills portability rules.
 
 use crate::catalog::is_name;
 use crate::source::Source;
@@ -27,7 +26,7 @@ pub fn run(source: &Source) -> (Vec<String>, bool) {
                 "FAIL {name}: frontmatter 'name: {name}' missing or mismatched"
             ));
         }
-        // install.sh: grep '^description: *..*.' — at least two characters after the colon.
+        // At least two characters after the colon (grep '^description: *..*.').
         let description_ok = lines.iter().any(|l| {
             l.strip_prefix("description:")
                 .is_some_and(|v| v.chars().count() >= 2)

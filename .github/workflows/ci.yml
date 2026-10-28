@@ -19,11 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Shellcheck
-        run: shellcheck install.sh hooks/scripts/*.sh tests/*.sh evals/*/*/scaffold.sh
-      - name: Skill portability (install.sh --check)
-        run: ./install.sh --check
+        run: shellcheck hooks/scripts/*.sh tests/*.sh assets/brand/render.sh evals/*/*/scaffold.sh
+      # tests/install.test.sh runs in the rust job, against the built binary.
       - name: Regression tests
-        run: bash tests/run.sh
+        run: |
+          for t in tests/*.test.sh; do
+            [ "$t" = tests/install.test.sh ] || bash "$t" || status=1
+          done
+          exit "${status:-0}"
 
   rust:
     name: Rust installer (${{ matrix.os }})
@@ -46,9 +49,8 @@ jobs:
           cargo clippy --all-targets -- -D warnings
           cargo test
           cargo build --release
-      # The binary answers --list and --check; install.sh does the rest
-      # (docs/plans/rust-installer.md, R1). The tests create symlinks as
-      # fixtures; without MSYS=winsymlinks:nativestrict, Git Bash's ln -s copies.
+      # The tests create symlinks as fixtures; without
+      # MSYS=winsymlinks:nativestrict, Git Bash's ln -s copies.
       - name: Catalog and installer tests against the binary
         env:
           MSYS: winsymlinks:nativestrict

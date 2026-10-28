@@ -9,33 +9,45 @@ Why this repo starts with an [ADR skill](docs/why-adrs.md): tests verify behavio
 | Component | Claude Code | Codex | Gemini CLI | OpenCode | Cursor | omp |
 | --- | --- | --- | --- | --- | --- | --- |
 | [`skills/`](skills/) — SKILL.md folders | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [`agents/`](agents/) · [`commands/`](commands/) · [`hooks/`](hooks/) · [`output-styles/`](output-styles/) | ✓ (plugin; agents also via `install.sh`) | adapt | adapt | adapt | adapt | adapt |
+| [`agents/`](agents/) · [`commands/`](commands/) · [`hooks/`](hooks/) · [`output-styles/`](output-styles/) | ✓ (plugin; agents also via the installer) | adapt | adapt | adapt | adapt | adapt |
 | [`rules/`](rules/) · [`prompts/`](prompts/) · [`policies/`](policies/) | copy | copy | copy | copy | copy | copy |
 
 Skills follow the [Agent Skills](https://agentskills.io) open standard — identical folders load natively in every harness above. The other component categories currently auto-load only via the Claude Code plugin; adapters for other harnesses are welcome.
 
 ## Install
 
-Install only the components you need, into the project that needs them. The installer copies them into the repository; commit them, and every teammate and every harness gets the same version.
+Install only the components you need, into the project that needs them. The `agentic-toolkit` installer copies them into the repository; commit them, and every teammate and every harness gets the same version. It is one binary with the components built in: no clone, git, or runtime needed.
 
 ```bash
-git clone https://github.com/DNRN/agentic-toolkit ~/src/agentic-toolkit
+# macOS, Linux
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/DNRN/agentic-toolkit/releases/latest/download/agentic-toolkit-installer.sh | sh
+```
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/DNRN/agentic-toolkit/releases/latest/download/agentic-toolkit-installer.ps1 | iex"
+```
+
+Both put `agentic-toolkit` in `~/.cargo/bin`; the [release page](https://github.com/DNRN/agentic-toolkit/releases/latest) has the archives and checksums. With Rust: `cargo install --locked --git https://github.com/DNRN/agentic-toolkit agentic-toolkit`.
+
+```bash
 cd ~/code/your-project
-~/src/agentic-toolkit/install.sh                # menu: what can be installed, what is installed
-~/src/agentic-toolkit/install.sh code-reviewer  # or name components; what they require comes along
+agentic-toolkit                  # the menu: what can be installed, what is installed
+agentic-toolkit code-reviewer    # or name components; what they require comes along
 git add .agents .claude && git commit -m "Add agentic-toolkit components"
 ```
 
 | Command | Effect |
 | --- | --- |
-| `install.sh` | Menu (on a terminal): numbers mark components to install or remove, `u` marks updates, `g` switches to the global scope; shows the plan and asks before changing anything |
-| `install.sh --list` | Status of every component, in this project and globally |
-| `install.sh NAME…` · `--all` | Install components and what they require |
-| `install.sh --update [NAME…]` | After `git pull` in the clone: refresh what changed upstream, restore deleted copies, add new requirements |
-| `install.sh --remove [NAME…]` | Remove what the installer installed, and requirements nothing else needs |
+| `agentic-toolkit` | The menu (on a terminal): space or a number marks a component to install or remove, `u` marks updates, `g` switches to the global scope, Enter shows the plan, `y` applies it |
+| `agentic-toolkit --list` | Status of every component, in this project and globally |
+| `agentic-toolkit NAME…` · `--all` | Install components and what they require |
+| `agentic-toolkit --update [NAME…]` | After upgrading the installer: refresh what changed, restore deleted copies, add new requirements |
+| `agentic-toolkit --remove [NAME…]` | Remove what the installer installed, and requirements nothing else needs |
 | `--project DIR` · `--global` | Scope: the git root of the working directory by default |
 | `--force` · `--dry-run` · `--yes` | Also overwrite or remove locally edited copies · print the plan only · don't ask |
-| `install.sh --check` | Validate skills against the Agent Skills portability rules |
+| `agentic-toolkit --check` | Validate skills against the Agent Skills portability rules |
+| `--source DIR` | Use a toolkit working tree instead of the built-in components (contributors) |
 
 Where a project install puts things ([ADR 0006](docs/adr/0006-project-scope-install-default.md)):
 
@@ -46,7 +58,7 @@ Where a project install puts things ([ADR 0006](docs/adr/0006-project-scope-inst
 | `.claude/agents/<name>.md` | Claude Code subagents; same condition |
 | `.agents/agentic-toolkit.tsv` | The installer: what it installed, why, and a content hash of each ([ADR 0008](docs/adr/0008-project-install-manifest.md)) |
 
-**Updating.** Components have no version numbers of their own. `--list` compares each copy with the hash recorded at install time and with the clone: `outdated` (changed upstream), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it). The installer never touches a file it didn't install (`foreign`).
+**Updating.** Install the new release the same way, then run `agentic-toolkit --update` in each project ([ADR 0010](docs/adr/0010-components-embedded-in-binary.md)). Components have no version numbers of their own. `--list` compares each copy with the hash recorded at install time and with the installer's: `outdated` (changed in the new release), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it). The installer never touches a file it didn't install (`foreign`).
 
 Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#evidence)):
 
@@ -57,7 +69,7 @@ Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#e
 
 ### Global install
 
-For a skill you want in every repository, such as `adr-planning`: `install.sh --global NAME`. Global installs are symlinks into the clone, so `git pull` updates them; `--mode copy` makes copies, and `--update` keeps each install's form.
+For a skill you want in every repository, such as `adr-planning`: `agentic-toolkit --global NAME`. Global installs are copies. With `--source DIR` they are symlinks into that toolkit folder instead, except on Windows, where copies stay the default (`--mode symlink` needs Developer Mode); `--mode` picks either, and `--update` keeps each install's form.
 
 | `--harness` | Target | Read by |
 | --- | --- | --- |
@@ -65,13 +77,13 @@ For a skill you want in every repository, such as `adr-planning`: `install.sh --
 | `claude` | `~/.claude/skills/` | Claude Code; also OpenCode, and Cursor with third-party extensibility on. Only without the plugin: a personal symlink to the plugin's skill folder hides the plugin's `agentic-toolkit:*` name, which the commit gate tells the agent to run, and a personal copy lists every skill twice |
 | `omp` | `~/.omp/agent/skills/` | omp; needed only when its `~/.agents` provider is turned off |
 
-- Codex names a *symlinked* skill `agentic-toolkit:<name>`, because its real path sits inside this plugin repo. `--mode copy` keeps the bare name.
+- Codex names a *symlinked* skill `agentic-toolkit:<name>`, because its real path sits inside this plugin repo. Copies keep the bare name.
 - In Claude Code, a personal `code-review` replaces the built-in `/code-review`.
-- `install.sh --global --remove` also removes the links and copies made by the 0.1.0 installer.
+- `agentic-toolkit --global --remove` also removes the links and copies made by the 0.1.0 installer (`install.sh`).
 
 ### Windows
 
-Run the installer from Git Bash or WSL. Project installs contain no symlinks, so a Windows checkout works without `core.symlinks`. Global installs are copies by default on Windows (`ln -s` in Git Bash copies without saying so). From WSL, `--global` reaches only the Linux-side harnesses.
+The installer is a native Windows program; it needs no Git Bash or WSL. Project installs contain no symlinks, so a Windows checkout works without `core.symlinks`. From WSL, `--global` reaches only the Linux-side harnesses.
 
 ## Claude Code full bundle (also loads agents, commands, hooks, styles)
 
@@ -86,8 +98,8 @@ Run the installer from Git Bash or WSL. Project installs contain no symlinks, so
 
 | Directory | Contents | How it loads |
 | --- | --- | --- |
-| [`skills/`](skills/) | SKILL.md folders, auto-discovered when relevant | Auto, every harness; [`install.sh`](#install) or the plugin |
-| [`agents/`](agents/) | Subagent definitions (`.md`) | Plugin, or `install.sh` into a project (Claude Code) |
+| [`skills/`](skills/) | SKILL.md folders, auto-discovered when relevant | Auto, every harness; [the installer](#install) or the plugin |
+| [`agents/`](agents/) | Subagent definitions (`.md`) | Plugin, or the installer into a project (Claude Code) |
 | [`commands/`](commands/) | Slash commands (`.md`) | Plugin (Claude Code) |
 | [`hooks/`](hooks/) | `hooks/hooks.json` + scripts, event-triggered | Plugin (Claude Code) |
 | [`output-styles/`](output-styles/) | Output style / persona definitions | Plugin (Claude Code) |
@@ -96,9 +108,10 @@ Run the installer from Git Bash or WSL. Project installs contain no symlinks, so
 | [`prompts/`](prompts/) | Plan / spec / review templates | Referenced by skills & commands |
 | [`policies/`](policies/) | Permission allow/deny presets | Copy into project settings |
 | [`evals/`](evals/) | Golden tasks per component in `claude plugin eval` format, scored against a no-plugin baseline | [`claude plugin eval .`](evals/README.md#run) |
-| [`tests/`](tests/) | Deterministic regression tests for hooks, `install.sh`, `catalog.tsv`, and release metadata | `tests/run.sh` |
-| [`installer/`](installer/) | The Rust installer `agentic-toolkit`, which replaces `install.sh` in 0.3.0 ([plan](docs/plans/rust-installer.md)); so far `--list` and `--check` | `cargo build --release` |
-| `catalog.tsv` | Every installable component: kind, path, harnesses, requirements, one-line summary ([ADR 0007](docs/adr/0007-component-catalog.md)) | Read by `install.sh` |
+| [`tests/`](tests/) | Deterministic regression tests for hooks, the installer, `catalog.tsv`, and release metadata | `tests/run.sh` |
+| [`installer/`](installer/) | The Rust installer `agentic-toolkit`: command line and terminal UI, with the components built in ([plan](docs/plans/rust-installer.md)) | `cargo build --release` |
+| `catalog.tsv` | Every installable component: kind, path, harnesses, requirements, one-line summary ([ADR 0007](docs/adr/0007-component-catalog.md)) | Read by the installer |
+| [`assets/brand/`](assets/brand/) | The Entropy Fox name and logo the installer shows; not MIT ([ADR 0011](docs/adr/0011-brand-assets-not-mit.md)) | Built into the installer |
 | [`docs/`](docs/) | Rationale essays, [ADRs](docs/adr/), [plans](docs/plans/) | Read |
 
 ## Conventions
@@ -109,7 +122,7 @@ Run the installer from Git Bash or WSL. Project installs contain no symlinks, so
 - No secrets, no machine-specific paths; scripts read relative to their component folder.
 - Agents, commands, and output styles are registered explicitly in `.claude-plugin/plugin.json` (the folder scan would also load each folder's README); `tests/run.sh` fails on an unregistered file.
 - Every skill, agent, and hook script has a row in `catalog.tsv`, with `requires` naming what it can't work without; `tests/run.sh` fails on a component without a row.
-- Validate before pushing: `./install.sh --check`, `tests/run.sh`, and `claude plugin validate .` if you touched `.claude-plugin/`. If you touched `installer/`: `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, and `AGENTIC_TOOLKIT_BIN=target/release/agentic-toolkit bash tests/install.test.sh` after `cargo build --release`. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these plus shellcheck, the installer tests on Linux, macOS, and Windows (Git Bash), an internal link and anchor check, and mermaid rendering on every push to `main` and every PR. CI does not run the [eval suite](evals/README.md) (it needs model credentials and costs money): run it when a skill, agent, or hook changes.
+- Validate before pushing: `tests/run.sh` (it builds the installer with `cargo`), and `claude plugin validate .` if you touched `.claude-plugin/`. If you touched `installer/`, also `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these plus shellcheck, the installer tests on Linux, macOS, and Windows, an internal link and anchor check, and mermaid rendering on every push to `main` and every PR. CI does not run the [eval suite](evals/README.md) (it needs model credentials and costs money): run it when a skill, agent, or hook changes.
 
 ## Releasing
 
@@ -117,8 +130,9 @@ Users of the plugin get a new release only when `version` in `.claude-plugin/plu
 
 1. Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a new `## [X.Y.Z] - YYYY-MM-DD` heading and add its compare link at the bottom.
 2. Set the same `X.Y.Z` in `.claude-plugin/plugin.json` and `installer/Cargo.toml`, then run `cargo build` to update `Cargo.lock` (semver: minor for new components or behavior, patch for fixes; a breaking rename or removal is a major once past 1.0).
-3. `tests/run.sh` (fails if the version has no dated changelog entry), then commit.
-4. `claude plugin tag --push` creates and pushes `agentic-toolkit--vX.Y.Z` after checking that `plugin.json` and the marketplace entry agree.
+3. `tests/run.sh` (fails if the versions differ or have no dated changelog entry), then commit and merge to `main`.
+4. `claude plugin tag --push` creates and pushes `agentic-toolkit--vX.Y.Z` (the plugin) after checking that `plugin.json` and the marketplace entry agree.
+5. `git tag installer/vX.Y.Z && git push origin installer/vX.Y.Z` starts [`installer-release.yml`](.github/workflows/installer-release.yml), which builds the installer for every platform and publishes the GitHub release with its install scripts. dist can't read the plugin's tag, so the installer has its own.
 
 ## Contributing
 
@@ -126,4 +140,4 @@ PR per component. Self-contained, follows the conventions above, includes an eva
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE), except the Entropy Fox name and logo in [`assets/brand/`](assets/brand/), which have [their own licence](assets/brand/LICENSE).

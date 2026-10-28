@@ -1,4 +1,4 @@
-//! The content hash of ADR 0008, byte-compatible with `install.sh`:
+//! The content hash of ADR 0008 (the same as the bash installer's, before 0.2.0):
 //!
 //! - a file: sha256 of its bytes with every `\r` removed (`tr -d '\r'`);
 //! - a folder: sha256 of the lines `"<file hash> ./<path>\n"` for every regular
@@ -8,7 +8,7 @@
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
-use crate::source::{Content, read_content};
+use crate::source::{Content, File, read_content};
 
 const OLD_MARKER: &str = ".agentic-toolkit-install";
 
@@ -24,11 +24,11 @@ pub fn file(bytes: &[u8]) -> String {
     hex(&hasher.finalize())
 }
 
-pub fn dir(files: &[(String, Vec<u8>)]) -> String {
+pub fn dir(files: &[(String, File)]) -> String {
     let mut lines: Vec<(String, &[u8])> = files
         .iter()
         .filter(|(rel, _)| rel.rsplit('/').next() != Some(OLD_MARKER))
-        .map(|(rel, bytes)| (format!("./{rel}"), bytes.as_slice()))
+        .map(|(rel, f)| (format!("./{rel}"), f.bytes.as_slice()))
         .collect();
     lines.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
     let mut hasher = Sha256::new();
@@ -43,7 +43,7 @@ pub fn dir(files: &[(String, Vec<u8>)]) -> String {
 
 pub fn content(content: &Content) -> String {
     match content {
-        Content::File(bytes) => file(bytes),
+        Content::File(f) => file(&f.bytes),
         Content::Dir(files) => dir(files),
     }
 }
@@ -58,7 +58,7 @@ mod tests {
     use super::*;
     use std::fs;
 
-    // Expected values computed with install.sh's hash_of on the same fixtures
+    // Expected values computed with the bash installer's hash_of on the same fixtures
     // (bash 5.3, GNU coreutils), so these tests need no bash.
 
     #[test]

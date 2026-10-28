@@ -1,35 +1,35 @@
 #!/usr/bin/env bash
-# Regression tests for install.sh (plan: docs/plans/selective-install.md).
-# It must never replace or remove anything it did not install, must not delete
-# local edits without --force, and must keep project installs consistent with
-# their manifest so that `git pull` + `install.sh --update` is the whole update.
+# Regression tests for the agentic-toolkit installer (docs/plans/rust-installer.md,
+# docs/plans/selective-install.md), through its command line. It must never
+# replace or remove anything it did not install, must not delete local edits
+# without --force, and must keep installs consistent with their manifest so
+# that upgrading the binary + `agentic-toolkit --update` is the whole update.
+#
+# Uses $AGENTIC_TOOLKIT_BIN, or builds target/release/agentic-toolkit.
 # shellcheck disable=SC2016 # holds evaluates its single-quoted conditions later
 set -u
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+
+BIN="${AGENTIC_TOOLKIT_BIN:-}"
+if [ -z "$BIN" ]; then
+  (cd "$SRC" && cargo build --release --quiet) || { echo "install: cargo build failed"; exit 1; }
+  BIN="$SRC/target/release/agentic-toolkit"
+  [ -f "$BIN.exe" ] && BIN="$BIN.exe"
+fi
+
 export HOME="$TMP/home"
 mkdir -p "$HOME"
 
-# A private toolkit clone, so tests can change components "upstream".
+# A private toolkit tree, so tests can change components "upstream"; the
+# installer reads it with --source, as a contributor would.
 C="$TMP/toolkit"
 mkdir -p "$C"
-cp -R "$SRC/install.sh" "$SRC/catalog.tsv" "$SRC/skills" "$SRC/agents" "$SRC/hooks" "$SRC/.claude-plugin" "$C/"
-I="$C/install.sh"
-
-# With AGENTIC_TOOLKIT_BIN set, the Rust installer answers --list and --check
-# (docs/plans/rust-installer.md, R1), reading state that install.sh wrote.
-if [ -n "${AGENTIC_TOOLKIT_BIN:-}" ]; then
-  mv "$C/install.sh" "$C/install-bash.sh"
-  cat > "$C/install.sh" <<EOF
-#!/usr/bin/env bash
-here=\$(cd "\$(dirname "\$0")" && pwd)
-for a in "\$@"; do case "\$a" in --list|--check) exec "$AGENTIC_TOOLKIT_BIN" --source "\$here" "\$@" ;; esac; done
-exec "\$here/install-bash.sh" "\$@"
-EOF
-  chmod +x "$C/install.sh"
-  echo "(--list and --check answered by $AGENTIC_TOOLKIT_BIN)"
-fi
+cp -R "$SRC/catalog.tsv" "$SRC/skills" "$SRC/agents" "$SRC/hooks" "$SRC/.claude-plugin" "$C/"
+I="$TMP/agentic-toolkit"
+printf '#!/usr/bin/env bash\nexec "%s" --source "%s" "$@"\n' "$BIN" "$C" > "$I"
+chmod +x "$I"
 
 TAB=$'\t'
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) WINDOWS=1 ;; *) WINDOWS=0 ;; esac
@@ -47,14 +47,14 @@ project() { # fresh git repository → path
   local p="$TMP/$1"
   rm -rf "$p"; mkdir -p "$p"; git -C "$p" init -q; printf '%s' "$p"
 }
-st() { # scope-column(project|global) name [install.sh args] → status from --list
+st() { # scope-column(project|global) name [installer args] → status from --list
   local col=$1 n=$2; shift 2
   "$I" --list "$@" | awk -v n="$n" -v c="$([ "$col" = project ] && echo 4 || echo 5)" '$2 == n { print $c }'
 }
 row() { cut -f2,5 "$1/.agents/agentic-toolkit.tsv" 2>/dev/null | grep -x "$2" >/dev/null; }
 in_manifest() { cut -f2 "$1/.agents/agentic-toolkit.tsv" 2>/dev/null | grep -qx "$2"; }
 
-# ---- global scope: the rules install.sh always had ---------------------------
+# ---- global scope ---------------------------------------------------------------
 G="$HOME/.claude/skills"
 mkdir -p "$G/code-review" "$HOME/elsewhere/doc-sync"
 echo mine > "$G/code-review/notes.txt"
@@ -322,27 +322,27 @@ out=$(cd "$P" && "$I" code-review doc-sync </dev/null 2>&1)
 check "both scopes: install warns" grep -q "also installed globally" <<<"$out"
 "$I" --global --remove >/dev/null
 
-# ---- interactive menu ----------------------------------------------------------
-P=$(project menu)
-cd "$P" || exit 1
-printf '3\n\ny\n' | "$I" --interactive >/dev/null
-check "menu: mark, review, apply installs" [ -d "$P/.agents/skills/doc-sync" ]
-printf '3\n\ny\n' | "$I" --interactive >/dev/null
-check "menu: marking an installed component removes it" [ ! -e "$P/.agents/skills/doc-sync" ]
-printf '1 2\nq\n' | "$I" --interactive >/dev/null
-check "menu: q quits without changes" [ ! -e "$P/.agents" ]
-printf '1\n\nn\nq\n' | "$I" --interactive >/dev/null
-check "menu: declining the review changes nothing" [ ! -e "$P/.agents" ]
-printf 'g\n1\n\ny\n' | "$I" --interactive >/dev/null
-check "menu: g switches to the global scope" holds 'default_form "$HOME/.agents/skills/adr-planning" && [ ! -e "$P/.agents" ]'
-out=$(printf '6\nq\n' | "$I" --interactive)
-check "menu: says why the hook can't be selected" grep -q "commit-gate: plugin only until roadmap phase 1 (portable" <<<"$out"
-out=$(printf '0\nq\n' | "$I" --interactive); rc=$?
-check "menu: 0 is rejected, not fatal" holds '[ "$rc" -eq 0 ] && grep -q "Not a component number: 0" <<<"$out"'
-"$I" code-reviewer >/dev/null
-out=$(printf '4\n\ny\n' | "$I" --interactive)
-check "menu: the review lists the requirement that applying removes" grep -q "remove  .agents/skills/code-review" <<<"$out"
-check "menu: applying removes it" [ ! -e "$P/.agents/skills/code-review" ]
+# ---- --source paths, usage errors -----------------------------------------------
+(cd "$TMP" && "$BIN" --source ./home/../toolkit --global --mode symlink adr-planning >/dev/null)
+check "relative --source: links point at the resolved toolkit path, no .." holds 'L="$HOME/.agents/skills/adr-planning"; [ -L "$L" ] && [ -d "$L" ] && ! readlink "$L" | grep -q "\.\."'
+(cd "$TMP/home" && "$BIN" --source ../toolkit --global --remove adr-planning >/dev/null)
+check "relative --source: removes the links it recognises" holds '! exists_link "$HOME/.agents/skills/adr-planning"'
+"$BIN" --bogus >/dev/null 2>&1; rc=$?
+check "usage errors exit 1" [ "$rc" -eq 1 ]
+"$BIN" --global --project "$TMP" --list >/dev/null 2>&1; rc=$?
+check "--global with --project is refused with exit 1" [ "$rc" -eq 1 ]
+
+# ---- built-in components (no --source) -------------------------------------------
+P=$(project builtin)
+(cd "$P" && "$BIN" code-reviewer >/dev/null)
+check "built in: installs without a toolkit folder" [ "$(cd "$P" && "$BIN" --list | awk '$2 == "code-review" { print $4 }')" = installed ]
+"$BIN" --global --mode symlink adr-planning >/dev/null 2>&1; rc=$?
+check "built in: global symlinks are refused (nothing to link to)" holds '[ "$rc" -eq 1 ] && ! exists_link "$HOME/.agents/skills/adr-planning"'
+"$BIN" --global adr-planning >/dev/null
+check "built in: global installs are copies" holds '[ -d "$HOME/.agents/skills/adr-planning" ] && [ ! -L "$HOME/.agents/skills/adr-planning" ]'
+"$BIN" --global --remove >/dev/null
+"$BIN" --check >/dev/null; rc=$?
+check "built in: --check passes for the built-in skills" [ "$rc" -eq 0 ]
 cd "$TMP" || exit 1
 
 [ "$fails" -eq 0 ] && echo "install: all passed" || echo "install: $fails failed"
