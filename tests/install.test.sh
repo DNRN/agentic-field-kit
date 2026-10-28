@@ -88,7 +88,7 @@ check "legacy copy: listed as installed" [ "$(st global doc-sync --global)" = in
 "$I" --global --remove >/dev/null
 check "legacy: --global --remove clears old links" [ ! -L "$G/code-review" ]
 check "legacy: --global --remove clears old copies" [ ! -e "$HOME/.omp/agent/skills/doc-sync" ]
-"$I" --global adr-planning >/dev/null
+"$I" --global --mode symlink adr-planning >/dev/null
 mv "$C/skills/adr-planning" "$TMP/adr-planning.moved"
 check "global: our symlink to a vanished folder is dangling" [ "$(st global adr-planning --global)" = dangling ]
 mv "$TMP/adr-planning.moved" "$C/skills/adr-planning"
@@ -264,7 +264,7 @@ rm -f "$HOME/.agents/skills/code-review"
 "$I" --global --update >/dev/null
 check "global update: a deleted link comes back as a link" [ -L "$HOME/.agents/skills/code-review" ]
 "$I" --global --remove >/dev/null
-"$I" --global adr-planning >/dev/null
+"$I" --global --mode symlink adr-planning >/dev/null
 cp "$C/catalog.tsv" "$TMP/catalog.orig"
 sed -i.bak '/^skill	adr-planning/d' "$C/catalog.tsv"
 mv "$C/skills/adr-planning" "$TMP/adr-planning.moved"
