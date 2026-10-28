@@ -2,7 +2,7 @@
 
 `install.sh` (see [selective install](selective-install.md)) does the job, but its menu is a numbered `read` loop and Windows needs Git Bash. This plan replaces it with one Rust binary, `agentic-toolkit`, that keeps the same command line, manifest, and safety rules, adds a real terminal UI, and shows the Entropy Fox logo and name.
 
-Decisions, all `Proposed`:
+Decisions, all `Accepted` (2026-10-28):
 
 - [ADR 0009](../adr/0009-installer-in-rust.md): the installer is a Rust binary (Ratatui UI) that replaces `install.sh`, with the same contract.
 - [ADR 0010](../adr/0010-components-embedded-in-binary.md): components are built into the binary; `--source DIR` for contributors and tests; releases with dist.
@@ -82,8 +82,8 @@ Interactive behaviour moves from the piped-stdin menu tests to Rust tests on Rat
 
 | # | Item | Depends on | ADR | Status |
 | --- | --- | --- | --- | --- |
-| R0 | This plan; ADRs 0009–0011 accepted | — | 0009–0011 | open |
-| R1 | Workspace, CI, `--check` and `--list` from embedded or `--source` | R0 | 0009, 0010 | open |
+| R0 | This plan; ADRs 0009–0011 accepted | — | 0009–0011 | done |
+| R1 | Workspace, CI, `--check` and `--list` from embedded or `--source` | R0 | 0009, 0010 | done locally on Linux; macOS and Windows wait for CI |
 | R2 | Engine port: install, update, remove at parity | R1 | 0009 | open |
 | R3 | Terminal UI | R2 | 0009 | open |
 | R4 | Entropy Fox brand | R3 | 0011 | open |
@@ -91,7 +91,7 @@ Interactive behaviour moves from the piped-stdin menu tests to Rust tests on Rat
 | R6 | Cutover: remove `install.sh`, docs, release 0.3.0 | R2–R5 | 0009, 0010 | open |
 | R7 | Guides in the UI | R6 | new, if guides need their own format | later |
 
-Before R1: merge PR #1 and release 0.2.0 (bash), so users get selective install now and the Rust port has a released contract to match.
+Before R1: merge PR #1 (done 2026-10-28) and release 0.2.0 (bash), so users get selective install now and the Rust port has a released contract to match.
 
 ## R1. Workspace, CI, read-only commands
 
@@ -99,12 +99,12 @@ Before R1: merge PR #1 and release 0.2.0 (bash), so users get selective install 
 
 - Root `Cargo.toml` workspace, crate `installer/`, binary `agentic-toolkit`. `rust-toolchain.toml` pins a stable toolchain.
 - `source` with both implementations; catalog parsing (same rules as `tests/catalog.test.sh`); `--check` (the Agent Skills rules `install.sh --check` applies).
-- `hash` with the golden test against `install.sh`.
+- `hash`, with golden tests: fixed expected values computed with `install.sh`'s algorithm (CRLF, nested folders, non-ASCII names, the old marker file), so they run without bash.
 - `--list` (read-only status) with the same table.
-- CI job `rust` on Linux, macOS, Windows: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`, `cargo build --release`.
-- `tests/install.test.sh`: when `AGENTIC_TOOLKIT_BIN` is set, `$C/install.sh` becomes a two-line wrapper `exec "$AGENTIC_TOOLKIT_BIN" --source "<dir of the wrapper>" "$@"`. Every other line of the suite stays.
+- CI job `rust` on Linux, macOS, Windows: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`, `cargo build --release`, then `tests/install.test.sh` against the binary.
+- `tests/install.test.sh`: when `AGENTIC_TOOLKIT_BIN` is set, `$C/install.sh` becomes a wrapper that sends `--list` and `--check` to the binary (`--source` the wrapper's folder) and everything else to the real `install.sh`. Every `--list` check then reads state that `install.sh` wrote, which is the compatibility R2 depends on. R2 sends every command to the binary. Every other line of the suite stays.
 
-**Acceptance.** Golden hash test passes for every component. Every `--list` status check in `tests/install.test.sh` passes against the binary on all three platforms.
+**Acceptance.** Golden hash tests pass. Every check in `tests/install.test.sh` passes with the binary answering `--list`, on all three platforms, including a fixture component with CRLF content, nested folders, and a non-ASCII file name installed by `install.sh`.
 
 ## R2. Engine port
 

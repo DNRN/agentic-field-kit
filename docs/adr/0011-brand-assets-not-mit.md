@@ -4,7 +4,7 @@ Date: 2026-10-28
 
 ## Status
 
-Proposed
+Accepted
 
 Plan: [Rust installer](../plans/rust-installer.md). Related: [ADR 0009](0009-installer-in-rust.md).
 

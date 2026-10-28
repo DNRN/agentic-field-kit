@@ -97,6 +97,7 @@ Run the installer from Git Bash or WSL. Project installs contain no symlinks, so
 | [`policies/`](policies/) | Permission allow/deny presets | Copy into project settings |
 | [`evals/`](evals/) | Golden tasks per component in `claude plugin eval` format, scored against a no-plugin baseline | [`claude plugin eval .`](evals/README.md#run) |
 | [`tests/`](tests/) | Deterministic regression tests for hooks, `install.sh`, `catalog.tsv`, and release metadata | `tests/run.sh` |
+| [`installer/`](installer/) | The Rust installer `agentic-toolkit`, which replaces `install.sh` in 0.3.0 ([plan](docs/plans/rust-installer.md)); so far `--list` and `--check` | `cargo build --release` |
 | `catalog.tsv` | Every installable component: kind, path, harnesses, requirements, one-line summary ([ADR 0007](docs/adr/0007-component-catalog.md)) | Read by `install.sh` |
 | [`docs/`](docs/) | Rationale essays, [ADRs](docs/adr/), [plans](docs/plans/) | Read |
 
@@ -108,14 +109,14 @@ Run the installer from Git Bash or WSL. Project installs contain no symlinks, so
 - No secrets, no machine-specific paths; scripts read relative to their component folder.
 - Agents, commands, and output styles are registered explicitly in `.claude-plugin/plugin.json` (the folder scan would also load each folder's README); `tests/run.sh` fails on an unregistered file.
 - Every skill, agent, and hook script has a row in `catalog.tsv`, with `requires` naming what it can't work without; `tests/run.sh` fails on a component without a row.
-- Validate before pushing: `./install.sh --check`, `tests/run.sh`, and `claude plugin validate .` if you touched `.claude-plugin/`. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these plus shellcheck, the installer tests on Windows (Git Bash), an internal link and anchor check, and mermaid rendering on every push to `main` and every PR. CI does not run the [eval suite](evals/README.md) (it needs model credentials and costs money): run it when a skill, agent, or hook changes.
+- Validate before pushing: `./install.sh --check`, `tests/run.sh`, and `claude plugin validate .` if you touched `.claude-plugin/`. If you touched `installer/`: `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, and `AGENTIC_TOOLKIT_BIN=target/release/agentic-toolkit bash tests/install.test.sh` after `cargo build --release`. CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these plus shellcheck, the installer tests on Linux, macOS, and Windows (Git Bash), an internal link and anchor check, and mermaid rendering on every push to `main` and every PR. CI does not run the [eval suite](evals/README.md) (it needs model credentials and costs money): run it when a skill, agent, or hook changes.
 
 ## Releasing
 
 Users of the plugin get a new release only when `version` in `.claude-plugin/plugin.json` changes; with an unchanged version, `claude plugin update` reports the plugin as current.
 
 1. Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a new `## [X.Y.Z] - YYYY-MM-DD` heading and add its compare link at the bottom.
-2. Set the same `X.Y.Z` in `.claude-plugin/plugin.json` (semver: minor for new components or behavior, patch for fixes; a breaking rename or removal is a major once past 1.0).
+2. Set the same `X.Y.Z` in `.claude-plugin/plugin.json` and `installer/Cargo.toml`, then run `cargo build` to update `Cargo.lock` (semver: minor for new components or behavior, patch for fixes; a breaking rename or removal is a major once past 1.0).
 3. `tests/run.sh` (fails if the version has no dated changelog entry), then commit.
 4. `claude plugin tag --push` creates and pushes `agentic-toolkit--vX.Y.Z` after checking that `plugin.json` and the marketplace entry agree.
 

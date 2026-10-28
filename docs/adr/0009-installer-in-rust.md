@@ -4,7 +4,7 @@ Date: 2026-10-28
 
 ## Status
 
-Proposed
+Accepted
 
 Plan: [Rust installer](../plans/rust-installer.md). Related: [ADR 0006](0006-project-scope-install-default.md) (install scope), [ADR 0007](0007-component-catalog.md) (catalog), [ADR 0008](0008-project-install-manifest.md) (manifest), [ADR 0010](0010-components-embedded-in-binary.md) (what the binary carries).
 
