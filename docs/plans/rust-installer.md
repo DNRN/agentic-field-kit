@@ -7,6 +7,7 @@ Decisions, all `Accepted` (2026-10-28):
 - [ADR 0009](../adr/0009-installer-in-rust.md): the installer is a Rust binary (Ratatui UI) that replaces `install.sh`, with the same contract.
 - [ADR 0010](../adr/0010-components-embedded-in-binary.md): components are built into the binary; `--source DIR` for contributors and tests; releases with dist.
 - [ADR 0011](../adr/0011-brand-assets-not-mit.md): the Entropy Fox name and logo live in `assets/brand/`, outside the MIT licence.
+- [ADR 0012](../adr/0012-logo-drawn-as-text.md): the logo is coloured ASCII, traced by hand from `fox.svg`, in every terminal (replaces the image, 2026-10-28).
 
 Unchanged: [ADR 0006](../adr/0006-project-scope-install-default.md) (project scope, copies), [ADR 0007](../adr/0007-component-catalog.md) (`catalog.tsv`), [ADR 0008](../adr/0008-project-install-manifest.md) (manifest, content hash).
 
@@ -21,7 +22,7 @@ $ cd ~/code/shop && agentic-toolkit
  ┌──────────────────────┐
  │                      │   Entropy Fox
  │                      │   agentic-toolkit 0.3.0
- │   fox logo, 24×8     │
+ │   ASCII fox, 41×12   │
  │                      │   Project  ~/code/shop
  │                      │   Plugin   not enabled
  │                      │   Harness  claude, codex, opencode
@@ -39,7 +40,8 @@ $ cd ~/code/shop && agentic-toolkit
  space mark · u update · g global · enter review · ? help · q quit
 ```
 
-- The logo is small: 24×8 cells next to the name. Terminals with the Kitty, Sixel, or iTerm2 image protocol show it at full resolution; others get half-block characters on the brand navy `#144b74`, where the dark legs stay visible. Half-blocks below 24 columns lose the head (checked 2026-10-28 at 16, 20, and 24 columns), so on a terminal smaller than 80×24, under `NO_COLOR`, or without truecolor, the logo is hidden and the name stays.
+- The logo is 41×12 cells of ASCII next to the name, in five brand shades as xterm 256-colour indices, so every terminal shows it; plain under `NO_COLOR`. Below 80×24 it is hidden and the name stays. At 80 columns the text beside it has 37 columns, so a longer header line (a long project path or harness list) wraps.
+- Colours come from the brand palette: rust borders (fox orange around popups), amber titles and keys (fox orange in popups), a brown bar on the selected row, tan labels; status colours (green, yellow, red, blue) in matching mid tones. 256-colour indices only, readable on dark and light backgrounds; `NO_COLOR` uses bold, dim, and reverse.
 - Enter shows the plan (the same lines as `--dry-run`) in a popup; `y` applies it, anything else goes back. Retired components and orphaned requirements appear in the plan as removals, so confirming the plan is the confirmation ([selective install, updates](selective-install.md#updates)).
 - Without a terminal, or with arguments, it is the same command line as `install.sh` today.
 
@@ -56,12 +58,12 @@ flowchart LR
     ST --> PL["plan"] --> AP["apply"]
   end
   SRC["source: embedded, or --source DIR"] --> CAT
-  BR["brand: logo, name"] --> UI
+  BR["brand: logo, name, palette"] --> UI
 ```
 
 - `engine` holds every rule that `install.sh` has today: scopes and refusals, legacy detection, status precedence, the plan for install, update, and remove, `ask-remove` confirmation, path filtering of manifest rows, form (link or copy) per global path. `cli` and `tui` only build requests and render plans.
-- `source` is a trait over "the toolkit": `Embedded` (`include_dir!` of `catalog.tsv` and every path it lists, plus the version) and `Directory(PathBuf)` for `--source`.
-- Crates: `ratatui`, `crossterm`, `ratatui-image` and `image` (PNG only), `clap`, `sha2`, `include_dir`. No async runtime, no network.
+- `source` is an enum over "the toolkit": `Embedded` (the files `installer/build.rs` builds in with `include_bytes!`: `catalog.tsv`, `.claude-plugin/plugin.json`, and every path the catalog lists) and `Dir(PathBuf)` for `--source`.
+- Crates: `ratatui` (with its crossterm backend, `ratatui::crossterm`), `clap`, `sha2`, `dunce`. No async runtime, no network.
 - Layout: a Cargo workspace at the repository root with one crate in `installer/`, so `cargo` and dist work from the root and the component folders stay as they are.
 
 ## Compatibility contract
@@ -86,7 +88,7 @@ Interactive behaviour moves from the piped-stdin menu tests to Rust tests on Rat
 | R1 | Workspace, CI, `--check` and `--list` from embedded or `--source` | R0 | 0009, 0010 | done (CI green on Linux, macOS, Windows, 2026-10-28) |
 | R2 | Engine port: install, update, remove at parity | R1 | 0009 | done (CI green on Linux, macOS, Windows, 2026-10-28) |
 | R3 | Terminal UI | R2 | 0009 | done: `TestBackend` tests, pseudo-terminal run on Linux |
-| R4 | Entropy Fox brand | R3 | 0011 | done: half-blocks checked in a pseudo-terminal and a rendered screenshot; Kitty, Sixel, and iTerm2 not yet seen in a real terminal |
+| R4 | Entropy Fox brand | R3 | 0011, 0012 | done: ASCII fox checked in a pseudo-terminal at 80×24 and 110×30, with and without `NO_COLOR` (it replaced the image and half-blocks, which showed only in truecolor terminals) |
 | R5 | Releases with dist | R2 | 0010 | done: `dist plan` locally; pull requests build every artifact |
 | R6 | Cutover: remove `install.sh`, docs, release 0.2.0 | R2–R5 | 0009, 0010 | done up to the release tags, which need `main` |
 | R7 | Guides in the UI | R6 | new, if guides need their own format | later |
@@ -132,11 +134,10 @@ Global symlinks need a folder to point into, and built-in components (ADR 0010) 
 
 **Change.**
 
-- `assets/brand/fox.svg`, copied unmodified from `entropyfox.com` (`site/static/img/fox.svg`); `assets/brand/fox.png`, rendered from it on the brand navy `#144b74`; `assets/brand/render.sh` regenerates the PNG with `rsvg-convert`; `assets/brand/LICENSE` per ADR 0011, also shipped as `brand/` in every release archive. The root `LICENSE` and README state the exception.
-- The binary embeds the PNG and the name constant `Entropy Fox`. `ratatui-image` picks Kitty, Sixel, or iTerm2 in terminals known to answer its query (kitty, Ghostty, WezTerm, iTerm2, foot), half-blocks on navy on other truecolor terminals (`COLORTERM`, or Windows Terminal); hidden below 80×24 or under `NO_COLOR`.
-- The capability query is only sent to those terminals: ratatui-image leaves a thread reading stdin until the terminal answers, which would steal keystrokes from a terminal that never does.
+- `assets/brand/fox.svg`, copied unmodified from `entropyfox.com` (`site/static/img/fox.svg`); `assets/brand/fox.txt`, the logo as 41×12 ASCII traced by hand from it, and `assets/brand/fox.colors`, one shade letter per character ([ADR 0012](../adr/0012-logo-drawn-as-text.md)); `assets/brand/LICENSE` per ADR 0011, also shipped as `brand/` in every release archive. The root `LICENSE` and README state the exception.
+- The binary embeds both text files and the name constant `Entropy Fox`. Shades are xterm 256-colour indices (no truecolor needed), mid tones that show on dark and light backgrounds; under `NO_COLOR` the characters alone. Hidden below 80×24.
 
-**Acceptance.** Screenshots in kitty (or WezTerm), a half-block terminal (for example GNOME Terminal), and Windows Terminal show the fox and the name; `NO_COLOR=1` shows the name only. `TestBackend` test: below 80×24 the name shows and the logo doesn't.
+**Acceptance.** The fox and the name show in a 256-colour terminal at 80×24 with every component row visible; `NO_COLOR=1` shows the fox uncoloured. `TestBackend` tests: at 80×24 the logo and every component row show; at 79×24 and 120×23 the name shows and the logo doesn't. Unit tests: every character of `fox.txt` has a shade in `fox.colors` and the logo fits 41×12; `logo` draws every character, in its shade or, plain, in none.
 
 ## R5. Releases with dist
 
@@ -165,7 +166,6 @@ Setup guides per tool and harness as `docs/guides/*.md`, built into the binary l
 
 - **Hash drift between bash and Rust** would mark every project `modified`. The golden test in R1 guards it before anything writes.
 - **Windows file semantics**: symlinks need Developer Mode, so global installs stay copies by default; paths in the manifest stay `/`-separated; long paths and file locks can make `remove` fail half-way. `apply` reports which paths it couldn't remove and leaves the manifest row for them.
-- **Terminal variety**: image protocol detection can misfire; half-blocks are the fallback, and hiding the logo is always safe.
 - **Unsigned binaries**: macOS Gatekeeper warns when a binary arrives through a browser download; the shell installer is the documented route.
 
 ## Out of scope

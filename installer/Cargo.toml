@@ -21,10 +21,7 @@ dist = true
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 dunce = "1"
-image = { version = "0.25", default-features = false, features = ["png"] }
 ratatui = "0.30"
-# No chafa (a system library) and no image formats beyond PNG.
-ratatui-image = { version = "11", default-features = false, features = ["crossterm"] }
 sha2 = "0.10"
 
 [dev-dependencies]

@@ -15,7 +15,7 @@ use ratatui::widgets::{
 };
 use ratatui::{DefaultTerminal, Frame};
 
-use crate::brand::{self, Logo};
+use crate::brand;
 use crate::engine::{self, Action, Options};
 use crate::list;
 use crate::manifest;
@@ -543,27 +543,98 @@ fn colored() -> bool {
     std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty())
 }
 
+/// The colour scheme: the brand oranges for chrome, and status colours in
+/// mid tones that stay apart from them. xterm 256-colour indices of middle
+/// lightness, so each reads on dark and on light backgrounds. `plain` is the
+/// style under `NO_COLOR`.
+fn themed(color: Style, plain: Style) -> Style {
+    if colored() { color } else { plain }
+}
+
+/// Amber, for titles, headings, and keys.
+const AMBER: Color = Color::Indexed(208);
+/// Tan, for labels.
+const TAN: Color = Color::Indexed(137);
+const GREEN: Color = Color::Indexed(71);
+const YELLOW: Color = Color::Indexed(178);
+const RED: Color = Color::Indexed(167);
+const BLUE: Color = Color::Indexed(67);
+
 fn status_style(status: &str) -> Style {
-    if !colored() {
-        return Style::default();
-    }
+    let fg = |c| themed(Style::default().fg(c), Style::default());
     match status {
-        "installed" | "linked" => Style::default().fg(Color::Green),
-        "outdated" | "missing" | "dangling" => Style::default().fg(Color::Yellow),
-        "modified" | "retired" | "foreign" => Style::default().fg(Color::Red),
-        "plugin" => Style::default().fg(Color::Cyan),
+        "installed" | "linked" => fg(GREEN),
+        "outdated" | "missing" | "dangling" => fg(YELLOW),
+        "modified" | "retired" | "foreign" => fg(RED),
+        "plugin" => fg(BLUE),
         _ => Style::default().add_modifier(Modifier::DIM),
     }
 }
 
+fn bold() -> Style {
+    Style::default().add_modifier(Modifier::BOLD)
+}
+
+/// The name, the component in the details, marks.
 fn accent() -> Style {
-    if colored() {
-        Style::default()
-            .fg(brand::ORANGE)
-            .add_modifier(Modifier::BOLD)
+    themed(bold().fg(brand::ORANGE), bold())
+}
+
+/// Box titles, headings, and the keys in the key line.
+fn title() -> Style {
+    themed(bold().fg(AMBER), bold())
+}
+
+/// Labels in the header and the table's column names.
+fn label() -> Style {
+    themed(Style::default().fg(TAN), Style::default())
+}
+
+fn border() -> Style {
+    themed(Style::default().fg(brand::RUST), Style::default())
+}
+
+/// The row under the cursor.
+fn selected() -> Style {
+    themed(
+        bold().bg(brand::BROWN).fg(Color::Indexed(230)),
+        Style::default().add_modifier(Modifier::REVERSED),
+    )
+}
+
+fn warning() -> Style {
+    themed(Style::default().fg(YELLOW), Style::default())
+}
+
+fn dim() -> Style {
+    Style::default().add_modifier(Modifier::DIM)
+}
+
+fn boxed(name: &str) -> Block<'static> {
+    let block = Block::bordered()
+        .border_style(border())
+        .title_style(title());
+    if name.is_empty() {
+        block
     } else {
-        Style::default().add_modifier(Modifier::BOLD)
+        block.title(format!(" {name} "))
     }
+}
+
+/// "↑↓ move · q quit" with each key in the title style and the rest dim.
+fn key_line(keys: &str) -> Line<'static> {
+    let mut spans = Vec::new();
+    for (i, part) in keys.split(" · ").enumerate() {
+        if i > 0 {
+            spans.push(Span::styled(" · ", dim()));
+        }
+        let (key, what) = part.split_once(' ').unwrap_or((part, ""));
+        spans.push(Span::styled(key.to_owned(), title()));
+        if !what.is_empty() {
+            spans.push(Span::styled(format!(" {what}"), dim()));
+        }
+    }
+    Line::from(spans)
 }
 
 fn header(app: &App) -> Vec<Line<'static>> {
@@ -587,18 +658,19 @@ fn header(app: &App) -> Vec<Line<'static>> {
     } else {
         "not enabled"
     };
+    let field = |name: &'static str, value: String| {
+        Line::from(vec![Span::styled(name, label()), Span::raw(value)])
+    };
     vec![
         Line::from(vec![
             Span::styled(brand::NAME, accent()),
-            Span::raw(format!(" · agentic-toolkit {}", ctx.version)),
+            Span::styled(" · ", dim()),
+            Span::raw(format!("agentic-toolkit {}", ctx.version)),
         ]),
         Line::from(""),
-        Line::from(format!("Project  {project}")),
-        Line::from(format!("Plugin   {plugin}")),
-        Line::from(format!(
-            "Harness  {}",
-            detected_harnesses(&ctx.home).join(", ")
-        )),
+        field("Project  ", project),
+        field("Plugin   ", plugin.to_owned()),
+        field("Harness  ", detected_harnesses(&ctx.home).join(", ")),
     ]
 }
 
@@ -635,11 +707,7 @@ fn details(app: &App) -> Text<'static> {
     if is_ours(&row.project) && !matches!(row.global.as_str(), "-" | "n/a" | "plugin") {
         lines.push(Line::from(Span::styled(
             "! also installed globally: Codex lists it twice.",
-            if colored() {
-                Style::default().fg(Color::Yellow)
-            } else {
-                Style::default()
-            },
+            warning(),
         )));
     }
     let scope_name = if app.scope == Scope::Project {
@@ -654,7 +722,10 @@ fn details(app: &App) -> Text<'static> {
     };
     if !paths.is_empty() {
         lines.push(Line::from(""));
-        lines.push(Line::from(format!("Paths ({scope_name})")));
+        lines.push(Line::from(Span::styled(
+            format!("Paths ({scope_name})"),
+            title(),
+        )));
         for p in paths {
             lines.push(Line::from(format!("  {}", engine::disp(app.scope, &p))));
         }
@@ -678,7 +749,7 @@ fn table(app: &App) -> Table<'static> {
         TableCell::from(Span::styled("project", scope_style(Scope::Project))),
         TableCell::from(Span::styled("global", scope_style(Scope::Global))),
     ])
-    .style(Style::default().add_modifier(Modifier::BOLD));
+    .style(label().add_modifier(Modifier::BOLD));
     let rows: Vec<TableRow> = app
         .rows
         .iter()
@@ -687,7 +758,7 @@ fn table(app: &App) -> Table<'static> {
             let mark = app.marks.get(&r.name).map(|m| m.symbol()).unwrap_or(" ");
             TableRow::new(vec![
                 TableCell::from(Span::styled(mark.to_owned(), accent())),
-                TableCell::from(format!("{}", i + 1)),
+                TableCell::from(Span::styled(format!("{}", i + 1), dim())),
                 TableCell::from(r.name.clone()),
                 TableCell::from(r.kind.clone()),
                 TableCell::from(Span::styled(r.project.clone(), status_style(&r.project))),
@@ -707,8 +778,8 @@ fn table(app: &App) -> Table<'static> {
         ],
     )
     .header(head)
-    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-    .block(Block::bordered().title(" Components "))
+    .row_highlight_style(selected())
+    .block(boxed("Components"))
 }
 
 /// Lines cut to `width` characters, so the popup knows how many rows it needs.
@@ -764,8 +835,9 @@ fn popup(
         String::new()
     };
     text.push(Line::from(Span::styled(format!("{more}{keys}"), accent())));
+    let popup_border = themed(Style::default().fg(brand::ORANGE), Style::default());
     frame.render_widget(
-        Paragraph::new(text).block(Block::bordered().title(format!(" {title} "))),
+        Paragraph::new(text).block(boxed(title).border_style(popup_border)),
         rect,
     );
     (wrapped.len(), visible)
@@ -785,10 +857,10 @@ const HELP: [&str; 9] = [
     "Same skill in both scopes: Codex lists it twice; Claude Code uses the global one.",
 ];
 
-/// Draws the whole screen; `logo` is the Entropy Fox when the terminal can show it.
-pub fn draw(frame: &mut Frame, app: &App, logo: Option<&mut Logo>) {
+/// Draws the whole screen, with the Entropy Fox when there is room for it.
+pub fn draw(frame: &mut Frame, app: &App) {
     let area = frame.area();
-    let show_logo = logo.is_some() && brand::logo_fits(area);
+    let show_logo = brand::logo_fits(area);
     let header_height = if show_logo { brand::LOGO_HEIGHT } else { 5 };
     let [top, body, status, keys] = Layout::vertical([
         Constraint::Length(header_height),
@@ -798,23 +870,32 @@ pub fn draw(frame: &mut Frame, app: &App, logo: Option<&mut Logo>) {
     ])
     .areas(area);
 
-    let text_area = match logo {
-        Some(logo) if show_logo => {
-            let [logo_area, gap, text] = Layout::horizontal([
-                Constraint::Length(brand::LOGO_WIDTH),
-                Constraint::Length(2),
-                Constraint::Min(10),
-            ])
-            .areas(top);
-            let _ = gap;
-            logo.render(frame, logo_area);
-            let [_, centered] =
-                Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).areas(text);
-            centered
-        }
-        _ => top,
+    let text_area = if show_logo {
+        let [logo_area, _gap, text] = Layout::horizontal([
+            Constraint::Length(brand::LOGO_WIDTH),
+            Constraint::Length(2),
+            Constraint::Min(10),
+        ])
+        .areas(top);
+        frame.render_widget(Paragraph::new(brand::logo(colored())), logo_area);
+        // The five header lines start a third of the way down, with room
+        // below for the lines that wrap beside the logo at 80 columns.
+        let [_, below] = Layout::vertical([
+            Constraint::Length(brand::LOGO_HEIGHT / 3),
+            Constraint::Min(1),
+        ])
+        .areas(text);
+        below
+    } else {
+        top
     };
-    frame.render_widget(Paragraph::new(header(app)), text_area);
+    let lines = Paragraph::new(header(app));
+    let lines = if show_logo {
+        lines.wrap(Wrap { trim: false })
+    } else {
+        lines
+    };
+    frame.render_widget(lines, text_area);
 
     let [left, right] =
         Layout::horizontal([Constraint::Length(47), Constraint::Min(20)]).areas(body);
@@ -823,18 +904,12 @@ pub fn draw(frame: &mut Frame, app: &App, logo: Option<&mut Logo>) {
     frame.render_widget(
         Paragraph::new(details(app))
             .wrap(Wrap { trim: false })
-            .block(Block::bordered()),
+            .block(boxed("")),
         right,
     );
 
     frame.render_widget(Paragraph::new(app.message.clone()), status);
-    frame.render_widget(
-        Paragraph::new(Span::styled(
-            KEYS,
-            Style::default().add_modifier(Modifier::DIM),
-        )),
-        keys,
-    );
+    frame.render_widget(Paragraph::new(key_line(KEYS)), keys);
 
     match &app.screen {
         Screen::List => {}
@@ -867,10 +942,9 @@ pub fn draw(frame: &mut Frame, app: &App, logo: Option<&mut Logo>) {
 /// whether everything applied could be done.
 pub fn run(mut app: App) -> io::Result<(Vec<String>, bool)> {
     let mut terminal: DefaultTerminal = ratatui::init();
-    let mut logo = brand::Logo::detect();
     let result = (|| -> io::Result<()> {
         while !app.quit {
-            terminal.draw(|frame| draw(frame, &app, logo.as_mut()))?;
+            terminal.draw(|frame| draw(frame, &app))?;
             if let Event::Key(key) = event::read()? {
                 app.on_key(key);
             }
@@ -1008,7 +1082,7 @@ mod tests {
 
     fn screen(app: &App, width: u16, height: u16) -> String {
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-        terminal.draw(|frame| draw(frame, app, None)).unwrap();
+        terminal.draw(|frame| draw(frame, app)).unwrap();
         let buffer = terminal.backend().buffer().clone();
         (0..height)
             .map(|y| {
@@ -1132,6 +1206,21 @@ mod tests {
             assert!(text.contains(name), "{name} missing:\n{text}");
         }
         assert!(text.contains(brand::NAME));
+        assert!(text.contains(FOX_LINE), "no logo at 80×24:\n{text}");
+    }
+
+    /// A line of the logo that nothing else on the screen draws.
+    const FOX_LINE: &str = "_/##########################=-._";
+
+    #[test]
+    fn below_80_by_24_the_name_stays_and_the_logo_goes() {
+        let f = fixture();
+        let app = app(&f);
+        for (width, height) in [(79, 24), (120, 23)] {
+            let text = screen(&app, width, height);
+            assert!(text.contains(brand::NAME), "{width}×{height}:\n{text}");
+            assert!(!text.contains(FOX_LINE), "{width}×{height}:\n{text}");
+        }
     }
 
     #[test]

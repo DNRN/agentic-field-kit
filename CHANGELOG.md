@@ -6,6 +6,8 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ### Changed
 
+- The installer draws the Entropy Fox as coloured ASCII, so every terminal shows it, including terminals without truecolor or image support, tmux, and `NO_COLOR` (uncoloured) ([ADR 0012](docs/adr/0012-logo-drawn-as-text.md)). It replaces the image and half-blocks, which showed only in truecolor terminals; the name's orange is now a 256-colour index too. At 80 columns, header lines longer than the 37 columns beside the logo wrap.
+- The terminal UI has an orange colour scheme from the Entropy Fox palette: rust borders (fox orange around popups), amber titles and keys, a brown bar on the selected row, tan labels, and status colours (green, yellow, red, blue) in matching mid tones. All are 256-colour indices of middle lightness, so they read on dark and on light backgrounds; `NO_COLOR` keeps bold, dim, and reverse only.
 - `adr-planning` briefs each Proposed ADR in a few lines (decision, strongest rejected alternative, costliest consequence, assumptions, path) instead of pasting it, and asks you to accept, change, or reject each one. It records the verdict in the ADR's Status: `Accepted`, or `Rejected` with the reason, keeping the file. It no longer implements a decision while it is Proposed, and it now also triggers when you give a verdict on a Proposed ADR.
 
 ## [0.2.0] - 2026-10-28

@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Shellcheck
-        run: shellcheck hooks/scripts/*.sh tests/*.sh assets/brand/render.sh evals/*/*/scaffold.sh
+        run: shellcheck hooks/scripts/*.sh tests/*.sh evals/*/*/scaffold.sh
       # tests/install.test.sh runs in the rust job, against the built binary.
       - name: Regression tests
         run: |

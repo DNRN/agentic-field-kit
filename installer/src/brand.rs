@@ -2,116 +2,120 @@
 //! Display only: nothing else in the installer depends on them, so a fork can
 //! replace this file and assets/brand/.
 
-use std::env;
-use std::time::Duration;
-
-use image::{DynamicImage, ImageFormat};
-use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::Color;
-use ratatui_image::StatefulImage;
-use ratatui_image::picker::cap_parser::QueryStdioOptions;
-use ratatui_image::picker::{Picker, ProtocolType};
-use ratatui_image::protocol::StatefulProtocol;
+use ratatui::style::{Color, Style};
+use ratatui::text::{Line, Span, Text};
 
 pub const NAME: &str = "Entropy Fox";
-/// Fox orange from the brand palette.
-pub const ORANGE: Color = Color::Rgb(0xff, 0x6d, 0x05);
+// The brand palette as xterm 256-colour indices, so it shows the same in
+// terminals without truecolor. Mid tones: each shows on dark and on light
+// backgrounds. The logo and the UI's colour scheme both use it.
+/// Fox orange (#ff6d05).
+pub const ORANGE: Color = Color::Indexed(202);
+pub const CREAM: Color = Color::Indexed(180);
+pub const LIGHT_ORANGE: Color = Color::Indexed(214);
+pub const RUST: Color = Color::Indexed(166);
+pub const BROWN: Color = Color::Indexed(94);
 
-/// The logo's cells. Half-blocks below 24 columns lose the fox's head
-/// (checked 2026-10-28 at 16, 20, and 24 columns).
-pub const LOGO_WIDTH: u16 = 24;
-pub const LOGO_HEIGHT: u16 = 8;
+/// The logo's cells: the size of assets/brand/fox.txt (ADR 0012).
+pub const LOGO_WIDTH: u16 = 41;
+pub const LOGO_HEIGHT: u16 = 12;
 
-const FOX_PNG: &[u8] = include_bytes!("../../assets/brand/fox.png");
+const FOX: &str = include_str!("../../assets/brand/fox.txt");
+/// One letter per character of FOX, naming its shade; see `shade`.
+const FOX_COLORS: &str = include_str!("../../assets/brand/fox.colors");
 
 /// Room for the logo next to the rest of the screen: 80×24 or larger.
 pub fn logo_fits(area: Rect) -> bool {
     area.width >= 80 && area.height >= 24
 }
 
-fn truecolor() -> bool {
-    env::var("COLORTERM").is_ok_and(|v| v == "truecolor" || v == "24bit")
-        || env::var_os("WT_SESSION").is_some()
+/// The brand shade a letter in fox.colors names.
+fn shade(key: u8) -> Option<Color> {
+    match key {
+        b'c' => Some(CREAM),
+        b'l' => Some(LIGHT_ORANGE),
+        b'o' => Some(ORANGE),
+        b'r' => Some(RUST),
+        b'b' => Some(BROWN),
+        _ => None,
+    }
 }
 
-/// Terminals known to answer the image-protocol query. ratatui-image's query
-/// leaves a thread reading stdin until the terminal answers, which would take
-/// keystrokes away from the UI in a terminal that never does. `TERM` and
-/// `TERM_PROGRAM` only: variables like `KITTY_WINDOW_ID` leak into terminals
-/// started inside kitty (IDE terminals, `script`) that don't answer.
-fn answers_graphics_query() -> bool {
-    let var = |k: &str| env::var(k).unwrap_or_default();
-    matches!(
-        var("TERM").as_str(),
-        "xterm-kitty" | "xterm-ghostty" | "foot" | "foot-extra"
-    ) || matches!(
-        var("TERM_PROGRAM").as_str(),
-        "iTerm.app" | "WezTerm" | "ghostty"
-    )
-}
-
-pub struct Logo {
-    protocol: StatefulProtocol,
-}
-
-impl Logo {
-    /// The logo for this terminal: its image protocol (Kitty, Sixel, iTerm2)
-    /// in terminals known to have one, half-blocks on a truecolor terminal,
-    /// otherwise none. Never under `NO_COLOR`. Call after entering the
-    /// alternate screen.
-    pub fn detect() -> Option<Logo> {
-        if env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()) {
-            return None;
-        }
-        let queried = if answers_graphics_query() {
-            let options = QueryStdioOptions {
-                timeout: Duration::from_millis(1000),
-                ..QueryStdioOptions::default()
-            };
-            Picker::from_query_stdio_with_options(options).ok()
-        } else {
-            None
-        };
-        let picker = match queried {
-            Some(p) if p.protocol_type() != ProtocolType::Halfblocks => p,
-            _ if truecolor() => Picker::halfblocks(),
-            _ => return None,
-        };
-        let image: DynamicImage =
-            image::load_from_memory_with_format(FOX_PNG, ImageFormat::Png).ok()?;
-        Some(Logo {
-            protocol: picker.new_resize_protocol(image),
+/// The logo as ASCII; in its shades when `colored`.
+pub fn logo(colored: bool) -> Text<'static> {
+    FOX.lines()
+        .zip(FOX_COLORS.lines())
+        .map(|(chars, keys)| {
+            if !colored {
+                return Line::raw(chars);
+            }
+            let keys = keys.as_bytes();
+            let mut spans = Vec::new();
+            let mut start = 0;
+            for end in 1..=chars.len() {
+                if end == chars.len() || keys.get(end) != keys.get(start) {
+                    let style = keys
+                        .get(start)
+                        .copied()
+                        .and_then(shade)
+                        .map_or_else(Style::default, |c| Style::default().fg(c));
+                    spans.push(Span::styled(&chars[start..end], style));
+                    start = end;
+                }
+            }
+            Line::from(spans)
         })
-    }
-
-    /// The logo drawn with half-block characters, for any truecolor terminal.
-    pub fn halfblocks() -> Option<Logo> {
-        let image = image::load_from_memory_with_format(FOX_PNG, ImageFormat::Png).ok()?;
-        Some(Logo {
-            protocol: Picker::halfblocks().new_resize_protocol(image),
-        })
-    }
-
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
-        frame.render_stateful_widget(StatefulImage::default(), area, &mut self.protocol);
-    }
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// fox.txt and fox.colors are edited by hand; a character without a
+    /// shade, or a logo that outgrows its cells, would show only on screen.
     #[test]
-    fn the_logo_decodes() {
-        let image = image::load_from_memory_with_format(FOX_PNG, ImageFormat::Png).unwrap();
-        assert!(image.width() > image.height());
+    fn every_character_of_the_logo_has_a_shade_and_fits() {
+        let chars: Vec<&str> = FOX.lines().collect();
+        let keys: Vec<&str> = FOX_COLORS.lines().collect();
+        assert_eq!(chars.len(), usize::from(LOGO_HEIGHT));
+        assert_eq!(keys.len(), chars.len());
+        for (n, (line, key)) in chars.iter().zip(&keys).enumerate() {
+            assert!(line.len() <= usize::from(LOGO_WIDTH), "line {n} too wide");
+            assert_eq!(line.len(), key.len(), "line {n}: lengths differ");
+            for (c, k) in line.bytes().zip(key.bytes()) {
+                assert!(c.is_ascii_graphic() || c == b' ', "line {n}: not ASCII");
+                if c == b' ' {
+                    assert_eq!(k, b' ', "line {n}: shade on a space");
+                } else {
+                    assert!(shade(k).is_some(), "line {n}: no shade for {:?}", c as char);
+                }
+            }
+        }
+        assert!(chars.iter().any(|l| l.len() == usize::from(LOGO_WIDTH)));
     }
 
+    /// Both modes draw every character of fox.txt; coloured, each character
+    /// has the shade fox.colors names for it, and plain, none.
     #[test]
-    fn the_logo_needs_80_by_24() {
-        assert!(logo_fits(Rect::new(0, 0, 80, 24)));
-        assert!(!logo_fits(Rect::new(0, 0, 79, 24)));
-        assert!(!logo_fits(Rect::new(0, 0, 120, 23)));
+    fn the_logo_keeps_every_character_in_its_shade() {
+        for colored in [false, true] {
+            let text = logo(colored);
+            assert_eq!(text.lines.len(), FOX.lines().count());
+            for ((line, chars), keys) in text.lines.iter().zip(FOX.lines()).zip(FOX_COLORS.lines())
+            {
+                let drawn: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+                assert_eq!(drawn, chars);
+                let mut at = 0;
+                for span in &line.spans {
+                    for (i, key) in keys.bytes().enumerate().skip(at).take(span.content.len()) {
+                        let want = if colored { shade(key) } else { None };
+                        assert_eq!(span.style.fg, want, "{chars:?} at {i}");
+                    }
+                    at += span.content.len();
+                }
+            }
+        }
     }
 }
