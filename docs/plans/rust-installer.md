@@ -87,8 +87,8 @@ Interactive behaviour moves from the piped-stdin menu tests to Rust tests on Rat
 | R2 | Engine port: install, update, remove at parity | R1 | 0009 | done (CI green on Linux, macOS, Windows, 2026-10-28) |
 | R3 | Terminal UI | R2 | 0009 | done: `TestBackend` tests, pseudo-terminal run on Linux |
 | R4 | Entropy Fox brand | R3 | 0011 | done: half-blocks checked in a pseudo-terminal and a rendered screenshot; Kitty, Sixel, and iTerm2 not yet seen in a real terminal |
-| R5 | Releases with dist | R2 | 0010 | open |
-| R6 | Cutover: remove `install.sh`, docs, release 0.3.0 | R2–R5 | 0009, 0010 | open |
+| R5 | Releases with dist | R2 | 0010 | done: `dist plan` locally; pull requests build every artifact |
+| R6 | Cutover: remove `install.sh`, docs, release 0.2.0 | R2–R5 | 0009, 0010 | done up to the release tags, which need `main` |
 | R7 | Guides in the UI | R6 | new, if guides need their own format | later |
 
 Before R1: merge PR #1 (done 2026-10-28). The separate bash release (0.2.0) is dropped: there are no users yet, so the first release with selective install is the Rust installer, as 0.2.0.
@@ -142,20 +142,20 @@ Global symlinks need a folder to point into, and built-in components (ADR 0010) 
 
 **Change.** `dist init` for the targets in ADR 0010 with shell and PowerShell installers; the generated release workflow; `tests/release.test.sh` also checks that `Cargo.toml`'s version equals `plugin.json`'s. Release steps in the README gain the binary.
 
-**Open question.** Plugin releases are tagged `agentic-toolkit--vX.Y.Z` by `claude plugin tag`. Whether dist's release workflow accepts that tag format is unverified; if it doesn't, a release pushes both tags from one commit. Settle this with a dry run (`dist plan`) before the first release.
+**Settled (dist 0.33.1).** dist can't parse `agentic-toolkit--vX.Y.Z` ("unexpected character '-' while parsing major version number"), and its default trigger would also start on that tag. With `tag-namespace = "installer"`, the release workflow runs only on `installer/vX.Y.Z`, so a release pushes the plugin tag and the installer tag from the same commit.
 
-**Acceptance.** A pre-release tag on a fork produces archives and checksums for every target; the shell installer installs a working binary on Linux and macOS, and the PowerShell installer on Windows; `agentic-toolkit --version` matches the tag.
+**Acceptance.** `dist plan --tag installer/v0.2.0` lists archives and checksums for every target and both installer scripts. With `pr-run-mode = "upload"`, every pull request builds all artifacts without publishing, so a target that stops building shows before a tag. The installer scripts themselves can only be run against a published release (R6).
 
 ## R6. Cutover
 
 **Change.**
 
-- Delete `install.sh`. CI's `./install.sh --check` becomes `agentic-toolkit --check --source .`; `tests/install.test.sh` runs only against the binary.
+- Delete `install.sh`. CI's `./install.sh --check` becomes `agentic-toolkit --check --source .`; `tests/install.test.sh` runs only against the binary (and builds it when `AGENTIC_TOOLKIT_BIN` isn't set).
 - README "Install": the install command per OS, `cargo install --git`, the UI, the command line, updating (upgrade the binary, then `--update`), Windows without Git Bash.
-- CHANGELOG `[Unreleased]` → 0.3.0: Added: binary, terminal UI, Entropy Fox branding. Changed (breaking): `install.sh` removed; components ship with the binary, so updating means upgrading the binary. ADR 0006's Git Bash consequence marked superseded by 0009.
-- Release 0.3.0.
+- CHANGELOG `[Unreleased]` → 0.2.0 (no users yet, so the bash selective install never shipped on its own): Added: binary, selective install, terminal UI, Entropy Fox branding. Changed (breaking): `install.sh` removed. ADR 0006's Git Bash consequence marked superseded by 0009.
+- Release 0.2.0: after merging to `main`, `claude plugin tag --push` and `git tag installer/v0.2.0`.
 
-**Acceptance.** Following the README on a machine without Rust, git, or the clone installs one skill into a scratch project on Linux, macOS, and Windows. A project installed with 0.2.0 updates cleanly with 0.3.0.
+**Acceptance.** Following the README on a machine without Rust, git, or the clone installs one skill into a scratch project on Linux, macOS, and Windows (after the release is published).
 
 ## R7. Guides (later)
 

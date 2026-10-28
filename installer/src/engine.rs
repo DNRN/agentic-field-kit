@@ -1,5 +1,5 @@
 //! Planning and applying installs, updates, and removals, with the rules of
-//! `install.sh` (docs/plans/selective-install.md): never touch what isn't
+//! docs/plans/selective-install.md: never touch what isn't
 //! ours, never overwrite or delete a local edit without `--force`, and remove
 //! what the user didn't name only after a confirmation or `--yes`. Only
 //! [`apply`] writes to disk.
@@ -603,7 +603,7 @@ pub fn plan_remove(
     Ok(plan)
 }
 
-/// The plan as `install.sh` prints it. `can_ask_remove`: removals the user
+/// The plan as the command line prints it. `can_ask_remove`: removals the user
 /// didn't name will happen (confirmation or `--yes`).
 pub fn show(
     ctx: &Ctx,

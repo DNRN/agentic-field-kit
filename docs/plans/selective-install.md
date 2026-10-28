@@ -1,5 +1,7 @@
 # Plan: selective, project-scoped installer
 
+> Built first in `install.sh`, then ported unchanged to the Rust installer before release ([Rust installer plan](rust-installer.md)); `install.sh` was removed in 0.2.0. The rules here still describe the installer's behaviour.
+
 Most users need one or two components from this repository, not all of them in every session. This plan turns `install.sh` into an installer that:
 
 - shows what can be installed and what is already installed,

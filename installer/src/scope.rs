@@ -13,7 +13,7 @@ pub enum Scope {
     Global,
 }
 
-/// The home directory as install.sh sees it: `$HOME`, else `%USERPROFILE%`.
+/// The home directory: `$HOME`, else `%USERPROFILE%`.
 pub fn home() -> PathBuf {
     env::var_os("HOME")
         .filter(|h| !h.is_empty())
@@ -64,7 +64,7 @@ pub fn is_toolkit_tree(dir: &Path) -> bool {
             .is_some_and(|n| n == "agentic-toolkit")
 }
 
-/// The project root, or why there is none (the messages install.sh prints).
+/// The project root, or why there is none.
 pub fn project(project_arg: Option<&Path>, source: &Source) -> Result<PathBuf, String> {
     let root = match project_arg {
         Some(dir) => real(dir)

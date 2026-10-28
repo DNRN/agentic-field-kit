@@ -4,7 +4,7 @@ Procedural knowledge the agent loads when relevant. Skills are the portable core
 
 ## Standard
 
-[Agent Skills](https://agentskills.io) open standard: one folder per skill with a `SKILL.md`. Portability rules (enforced by OpenCode, Cursor, and `./install.sh --check`):
+[Agent Skills](https://agentskills.io) open standard: one folder per skill with a `SKILL.md`. Portability rules (enforced by OpenCode, Cursor, and `agentic-toolkit --check --source .`):
 
 - Folder name = frontmatter `name`, lowercase alphanumeric with single hyphens (`kebab-name`).
 - Frontmatter: only `name` + `description` (+ optional `license`, `metadata` string map). No custom top-level fields — tool-specific toggles go in `metadata` (quoted values), e.g. OpenCode's `opencode/slash`, `opencode/autoinvoke`.
@@ -28,6 +28,6 @@ skills/<kebab-name>/
 
 ## Distribution
 
-- `install.sh` copies the skills you pick into a project's `.agents/skills/` (Codex, Gemini CLI, Cursor, OpenCode, omp) and `.claude/skills/` (Claude Code, unless the project enables the plugin), or links them into `~/.agents/skills/` with `--global`: see [Install](../README.md#install).
+- The `agentic-toolkit` installer copies the skills you pick into a project's `.agents/skills/` (Codex, Gemini CLI, Cursor, OpenCode, omp) and `.claude/skills/` (Claude Code, unless the project enables the plugin), or into `~/.agents/skills/` with `--global`: see [Install](../README.md#install). Skills are built into the installer, so a change reaches users with the next release.
 - A new skill needs a row in [`catalog.tsv`](../catalog.tsv), or the installer can't offer it; `tests/run.sh` fails without one.
 - Or copy a single folder into any harness's skills dir by hand.

@@ -43,7 +43,7 @@ pub fn file(root: &Path) -> PathBuf {
 }
 
 /// The manifest's non-empty lines as bytes, without `\n` or a trailing `\r`.
-/// Bytes, not text: rows install.sh would keep (awk) survive a rewrite even
+/// Bytes, not text: every row survives a rewrite even
 /// when they aren't UTF-8. A missing manifest has no lines.
 fn raw_lines(root: &Path) -> io::Result<Vec<Vec<u8>>> {
     match fs::read(file(root)) {

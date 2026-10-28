@@ -192,7 +192,7 @@ fn warn_both_scopes(ctx: &Ctx, plan: &Plan, run: &Run) -> bool {
 }
 
 fn main() -> ExitCode {
-    // Usage errors exit 1, as install.sh's do; --help and --version exit 0.
+    // Usage errors exit 1; --help and --version exit 0.
     let args = match Args::try_parse() {
         Ok(args) => args,
         Err(e) => {
@@ -218,7 +218,7 @@ fn main() -> ExitCode {
         return die(&format!("not a component name: {bad} (see --list)"));
     }
     let source = match &args.source {
-        // Absolute and with `..` resolved, without following links, as install.sh's `cd && pwd`.
+        // Absolute and with `..` resolved, without following links (bash's `cd && pwd`).
         Some(dir) if dir.is_dir() => match std::path::absolute(dir) {
             Ok(dir) => Source::Dir(scope::normalize(&dir)),
             Err(e) => return die(&format!("{}: {e}", dir.display())),
