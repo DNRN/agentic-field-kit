@@ -939,3 +939,91 @@ mod tests {
         );
     }
 }
+
+#[cfg(all(test, unix))]
+mod legacy_link_tests {
+    use super::*;
+    use crate::catalog::Catalog;
+    use crate::source::Source;
+    use std::os::unix::fs::symlink;
+
+    fn tree(dir: &Path, plugin_name: Option<&str>) {
+        fs::create_dir_all(dir.join("skills/doc-sync")).unwrap();
+        fs::write(dir.join("skills/doc-sync/SKILL.md"), "mine\n").unwrap();
+        fs::write(dir.join("catalog.tsv"), "").unwrap();
+        if let Some(name) = plugin_name {
+            fs::create_dir_all(dir.join(".claude-plugin")).unwrap();
+            fs::write(
+                dir.join(".claude-plugin/plugin.json"),
+                format!("{{\"name\": \"{name}\"}}"),
+            )
+            .unwrap();
+        }
+    }
+
+    fn global_removals(home: &Path) -> Vec<String> {
+        let source = Source::Embedded;
+        let catalog = Catalog::parse(&source.catalog_text().unwrap());
+        let ctx = Ctx {
+            version: source.version(),
+            source,
+            catalog,
+            root: None,
+            home: home.to_path_buf(),
+        };
+        let opts = Options {
+            force: false,
+            mode_arg: None,
+            mode: Mode::Copy,
+            harnesses: Vec::new(),
+        };
+        let plan = plan_remove(&ctx, &opts, Scope::Global, &[]).unwrap();
+        plan.steps
+            .into_iter()
+            .filter(|s| s.verb == Verb::Remove)
+            .flat_map(|s| s.paths)
+            .collect()
+    }
+
+    #[test]
+    fn a_link_into_someone_elses_skills_folder_is_not_ours() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path().join("home");
+        tree(&tmp.path().join("mine"), None);
+        fs::create_dir_all(home.join(".claude/skills")).unwrap();
+        symlink(
+            tmp.path().join("mine/skills/doc-sync"),
+            home.join(".claude/skills/doc-sync"),
+        )
+        .unwrap();
+        assert!(global_removals(&home).is_empty());
+    }
+
+    #[test]
+    fn a_link_into_an_agentic_toolkit_clone_is_ours_also_when_relative() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path().join("home");
+        tree(&home.join("src/agentic-toolkit"), Some("agentic-toolkit"));
+        fs::create_dir_all(home.join(".claude/skills")).unwrap();
+        symlink(
+            "../../src/agentic-toolkit/skills/doc-sync",
+            home.join(".claude/skills/doc-sync"),
+        )
+        .unwrap();
+        assert_eq!(global_removals(&home), [".claude/skills/doc-sync"]);
+    }
+
+    #[test]
+    fn a_link_to_another_component_of_the_clone_is_not_ours() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path().join("home");
+        tree(&home.join("src/agentic-toolkit"), Some("agentic-toolkit"));
+        fs::create_dir_all(home.join(".agents/skills")).unwrap();
+        symlink(
+            home.join("src/agentic-toolkit/skills/doc-sync"),
+            home.join(".agents/skills/code-review"),
+        )
+        .unwrap();
+        assert!(global_removals(&home).is_empty());
+    }
+}

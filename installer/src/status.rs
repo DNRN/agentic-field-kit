@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::catalog::{Catalog, Component};
 use crate::hash;
 use crate::manifest;
-use crate::scope::{Scope, plugin_on};
+use crate::scope::{self, Scope, plugin_on};
 use crate::source::Source;
 
 pub struct Ctx {
@@ -83,24 +83,34 @@ impl Ctx {
 
     /// Installed before the manifest existed: a symlink into the toolkit's
     /// `skills/`, or a copy carrying the old marker file.
-    fn legacy_ours(&self, path: &Path) -> bool {
+    fn legacy_ours(&self, path: &Path, name: &str) -> bool {
         match fs::symlink_metadata(path) {
             Ok(meta) if meta.file_type().is_symlink() => {
                 let Ok(target) = fs::read_link(path) else {
                     return false;
                 };
                 match self.source.dir() {
+                    // As install.sh: the link's target lies inside this toolkit's skills/.
                     Some(dir) => {
                         let skills = dunce::simplified(&dir.join("skills")).to_path_buf();
                         let target = dunce::simplified(&target).to_path_buf();
                         target.starts_with(&skills) && target != skills
                     }
-                    // Built-in components: a link into any agentic-toolkit clone's skills/.
-                    None => target
-                        .parent()
-                        .filter(|p| p.file_name().is_some_and(|n| n == "skills"))
-                        .and_then(Path::parent)
-                        .is_some_and(|clone| clone.join("catalog.tsv").is_file()),
+                    // Built-in components: a link to `<clone>/skills/<name>` of a
+                    // real agentic-toolkit clone, so nothing else gets replaced.
+                    None => {
+                        let target = match path.parent() {
+                            Some(dir) if target.is_relative() => dir.join(&target),
+                            _ => target,
+                        };
+                        let target = scope::normalize(&target);
+                        target.file_name().is_some_and(|n| n == name)
+                            && target
+                                .parent()
+                                .filter(|p| p.file_name().is_some_and(|n| n == "skills"))
+                                .and_then(Path::parent)
+                                .is_some_and(scope::is_toolkit_tree)
+                    }
                 }
             }
             Ok(_) => path.join(".agentic-toolkit-install").is_file(),
@@ -117,7 +127,10 @@ impl Ctx {
             .map(|r| r.paths())
             .unwrap_or_default();
         for p in self.candidates(scope, name) {
-            if !paths.contains(&p) && exists(&root.join(&p)) && self.legacy_ours(&root.join(&p)) {
+            if !paths.contains(&p)
+                && exists(&root.join(&p))
+                && self.legacy_ours(&root.join(&p), name)
+            {
                 paths.push(p);
             }
         }

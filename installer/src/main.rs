@@ -42,7 +42,7 @@ struct Args {
     #[arg(long, value_name = "DIR")]
     project: Option<PathBuf>,
     /// Use the global scope (your home directory)
-    #[arg(long, conflicts_with = "project")]
+    #[arg(long)]
     global: bool,
     /// Global target: agents, claude, or omp (repeatable)
     #[arg(long, value_name = "NAME")]
@@ -221,7 +221,21 @@ fn warn_both_scopes(ctx: &Ctx, plan: &Plan, run: &Run) -> bool {
 }
 
 fn main() -> ExitCode {
-    let args = Args::parse();
+    // Usage errors exit 1, as install.sh's do; --help and --version exit 0.
+    let args = match Args::try_parse() {
+        Ok(args) => args,
+        Err(e) => {
+            let _ = e.print();
+            return if e.use_stderr() {
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            };
+        }
+    };
+    if args.global && args.project.is_some() {
+        return die("choose --project DIR or --global, not both");
+    }
     let actions = [args.list, args.check, args.update, args.remove]
         .iter()
         .filter(|a| **a)
@@ -233,8 +247,9 @@ fn main() -> ExitCode {
         return die(&format!("not a component name: {bad} (see --list)"));
     }
     let source = match &args.source {
+        // Absolute and with `..` resolved, without following links, as install.sh's `cd && pwd`.
         Some(dir) if dir.is_dir() => match std::path::absolute(dir) {
-            Ok(dir) => Source::Dir(dir),
+            Ok(dir) => Source::Dir(scope::normalize(&dir)),
             Err(e) => return die(&format!("{}: {e}", dir.display())),
         },
         Some(dir) => return die(&format!("no such toolkit folder: {}", dir.display())),

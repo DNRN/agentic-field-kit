@@ -336,6 +336,14 @@ if [ -n "${AGENTIC_TOOLKIT_BIN:-}" ]; then
   check "upgrade: nor in an install.sh global copy" holds 'grep -q "^  ok      doc-sync: up to date$" <<<"$out" && ! grep -qvE "^  ok      " <<<"$out"'
   check "upgrade: and leaves the global manifest byte for byte" cmp -s "$HOME/.agents/agentic-toolkit.tsv" "$TMP/upgrade.global"
   "$I" --global --remove >/dev/null
+  (cd "$TMP" && "$AGENTIC_TOOLKIT_BIN" --source ./home/../toolkit --global --mode symlink adr-planning >/dev/null)
+  check "relative --source: links point at the resolved toolkit path, no .." holds 'L="$HOME/.agents/skills/adr-planning"; [ -L "$L" ] && [ -d "$L" ] && ! readlink "$L" | grep -q "\.\."'
+  (cd "$TMP/home" && "$AGENTIC_TOOLKIT_BIN" --source ../toolkit --global --remove adr-planning >/dev/null)
+  check "relative --source: removes the links it recognises" holds '! exists_link "$HOME/.agents/skills/adr-planning"'
+  "$AGENTIC_TOOLKIT_BIN" --bogus >/dev/null 2>&1; rc=$?
+  check "usage errors exit 1, as install.sh's do" [ "$rc" -eq 1 ]
+  "$AGENTIC_TOOLKIT_BIN" --global --project "$TMP" --list >/dev/null 2>&1; rc=$?
+  check "--global with --project is refused with exit 1" [ "$rc" -eq 1 ]
   cd "$TMP" || exit 1
 fi
 
