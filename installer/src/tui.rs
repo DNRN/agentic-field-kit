@@ -2,6 +2,7 @@
 //! scope, marks for install (+), remove (-), and update (~), a review of the
 //! plan, and applying it through the engine. The UI never writes files itself.
 
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::io;
 
@@ -9,7 +10,9 @@ use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, Ke
 use ratatui::layout::{Constraint, Flex, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Cell, Clear, Paragraph, Row as TableRow, Table, TableState, Wrap};
+use ratatui::widgets::{
+    Block, Cell as TableCell, Clear, Paragraph, Row as TableRow, Table, TableState, Wrap,
+};
 use ratatui::{DefaultTerminal, Frame};
 
 use crate::brand::{self, Logo};
@@ -45,10 +48,23 @@ pub struct RowInfo {
     pub global: String,
 }
 
+/// The plan under review. `y` applies it only if nothing blocks it, it isn't
+/// a dry run, and every line has been on screen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Review {
+    pub lines: Vec<String>,
+    /// Each action's plan as reviewed; applying re-plans each action after
+    /// the ones before it and stops if the plan no longer matches.
+    pub reviewed: Vec<(Action, Vec<String>)>,
+    /// Why the plan can't be applied, if it can't.
+    pub blocked: Option<String>,
+    pub scroll: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
     List,
-    Review(Vec<String>),
+    Review(Review),
     Result(Vec<String>),
     Help,
 }
@@ -59,6 +75,8 @@ pub struct App {
     /// project scope ignores harness and mode.
     pub opts: Options,
     pub scope: Scope,
+    /// `--dry-run`: plans are shown, never applied.
+    pub dry_run: bool,
     /// Why there is no project, when there is none.
     pub why: Option<String>,
     pub rows: Vec<RowInfo>,
@@ -69,10 +87,16 @@ pub struct App {
     pub quit: bool,
     /// Every line applied this session, printed after the UI closes.
     pub log: Vec<String>,
+    /// Something applied this session couldn't be done (exit status 1).
+    pub failed: bool,
+    /// Set while drawing: the review's wrapped line count and visible rows,
+    /// and whether its last line has been on screen.
+    review_rows: Cell<(usize, usize)>,
+    review_seen_end: Cell<bool>,
 }
 
 impl App {
-    pub fn new(ctx: Ctx, opts: Options, global: bool, why: Option<String>) -> App {
+    pub fn new(ctx: Ctx, opts: Options, global: bool, dry_run: bool, why: Option<String>) -> App {
         let scope = if global || ctx.root.is_none() {
             Scope::Global
         } else {
@@ -86,6 +110,7 @@ impl App {
             ctx,
             opts,
             scope,
+            dry_run,
             why,
             rows: Vec::new(),
             cursor: 0,
@@ -94,6 +119,9 @@ impl App {
             message,
             quit: false,
             log: Vec::new(),
+            failed: false,
+            review_rows: Cell::new((0, 0)),
+            review_seen_end: Cell::new(false),
         };
         app.refresh();
         app
@@ -152,20 +180,50 @@ impl App {
             self.quit = true;
             return;
         }
-        match self.screen.clone() {
+        if matches!(self.screen, Screen::Review(_)) {
+            self.on_review_key(key.code);
+            return;
+        }
+        match self.screen {
             Screen::List => self.on_list_key(key.code),
-            Screen::Review(_) => match key.code {
-                KeyCode::Char('y') | KeyCode::Char('Y') => self.apply(),
-                _ => {
-                    self.screen = Screen::List;
-                    self.message = "Nothing changed.".into();
-                }
-            },
             Screen::Result(_) => match key.code {
                 KeyCode::Char('q') => self.quit = true,
                 _ => self.screen = Screen::List,
             },
-            Screen::Help => self.screen = Screen::List,
+            Screen::Help | Screen::Review(_) => self.screen = Screen::List,
+        }
+    }
+
+    fn on_review_key(&mut self, code: KeyCode) {
+        let (total, visible) = self.review_rows.get();
+        let last = total.saturating_sub(visible);
+        let Screen::Review(review) = &mut self.screen else {
+            return;
+        };
+        match code {
+            KeyCode::Up | KeyCode::Char('k') => review.scroll = review.scroll.saturating_sub(1),
+            KeyCode::Down | KeyCode::Char('j') => review.scroll = (review.scroll + 1).min(last),
+            KeyCode::PageUp => review.scroll = review.scroll.saturating_sub(visible.max(1)),
+            KeyCode::PageDown => review.scroll = (review.scroll + visible.max(1)).min(last),
+            KeyCode::Home => review.scroll = 0,
+            KeyCode::End => review.scroll = last,
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                let blocked = review.blocked.clone();
+                if self.dry_run {
+                    self.screen = Screen::List;
+                    self.message = "Dry run: nothing changed.".into();
+                } else if let Some(why) = blocked {
+                    self.message = why;
+                } else if !self.review_seen_end.get() {
+                    self.message = "Scroll to the end of the plan first (↓ or End).".into();
+                } else {
+                    self.apply();
+                }
+            }
+            _ => {
+                self.screen = Screen::List;
+                self.message = "Nothing changed.".into();
+            }
         }
     }
 
@@ -206,6 +264,9 @@ impl App {
         }
         let st = self.status(&row);
         match st.as_str() {
+            "-" if self.ctx.component(&row.name).is_none() => {
+                self.message = format!("{}: no longer in the toolkit", row.name);
+            }
             "-" => {
                 self.marks.insert(row.name, Mark::Install);
             }
@@ -308,6 +369,26 @@ impl App {
         }
     }
 
+    /// Everything `names` require, directly or through other requirements.
+    fn requirements(&self, names: &[String]) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        let mut todo: Vec<String> = names.to_vec();
+        while let Some(n) = todo.pop() {
+            for r in self
+                .ctx
+                .component(&n)
+                .map(|c| c.requires.clone())
+                .unwrap_or_default()
+            {
+                if !out.contains(&r) {
+                    out.push(r.clone());
+                    todo.push(r);
+                }
+            }
+        }
+        out
+    }
+
     /// The plans for the marks; confirming applies them, so removals the user
     /// didn't name are shown as removals.
     pub fn review(&mut self) {
@@ -318,17 +399,54 @@ impl App {
         }
         let opts = self.scope_opts();
         let mut lines = Vec::new();
-        for (action, names) in requests {
-            match engine::plan_action(&self.ctx, &opts, action, self.scope, &names, false) {
-                Ok(plan) => lines.extend(engine::show(&self.ctx, &opts, self.scope, &plan, true)),
-                Err(e) => lines.push(format!("! {e}")),
+        let mut reviewed = Vec::new();
+        let mut blocked = None;
+        let installs: Vec<String> = requests
+            .iter()
+            .filter(|(a, _)| *a == Action::Install)
+            .flat_map(|(_, n)| n.clone())
+            .collect();
+        let needed = self.requirements(&installs);
+        for (action, names) in &requests {
+            if *action == Action::Remove
+                && let Some(n) = names.iter().find(|n| needed.contains(n))
+            {
+                let why = format!(
+                    "! {n} is needed by a component marked for install; unmark one of them"
+                );
+                lines.push(why.clone());
+                blocked = Some(why);
+                continue;
+            }
+            match engine::plan_action(&self.ctx, &opts, *action, self.scope, names, false) {
+                Ok(plan) => {
+                    let shown = engine::show(&self.ctx, &opts, self.scope, &plan, true);
+                    lines.extend(shown.iter().cloned());
+                    reviewed.push((*action, shown));
+                }
+                Err(e) => {
+                    let why = format!("! {e}");
+                    lines.push(why.clone());
+                    blocked = Some(why);
+                }
             }
         }
-        self.screen = Screen::Review(lines);
+        self.review_seen_end.set(false);
+        self.screen = Screen::Review(Review {
+            lines,
+            reviewed,
+            blocked,
+            scroll: 0,
+        });
     }
 
-    /// Plans and applies each marked action in turn, as `--yes` would.
+    /// Plans and applies each reviewed action in turn, as `--yes` would. An
+    /// action whose plan differs from the reviewed one is not applied.
     pub fn apply(&mut self) {
+        let Screen::Review(review) = &self.screen else {
+            return;
+        };
+        let reviewed = review.reviewed.clone();
         let opts = self.scope_opts();
         let mut lines = Vec::new();
         let mut ok = true;
@@ -343,7 +461,20 @@ impl App {
                         continue;
                     }
                 };
-            lines.extend(engine::show(&self.ctx, &opts, self.scope, &plan, true));
+            let shown = engine::show(&self.ctx, &opts, self.scope, &plan, true);
+            if reviewed.iter().find(|(a, _)| *a == action).map(|(_, s)| s) != Some(&shown) {
+                lines.push(format!(
+                    "! the {} plan changed after the steps before it; not applied, review again",
+                    match action {
+                        Action::Install => "install",
+                        Action::Update => "update",
+                        Action::Remove => "remove",
+                    }
+                ));
+                ok = false;
+                continue;
+            }
+            lines.extend(shown);
             ok &= !plan.skipped;
             if plan.has_changes() {
                 match engine::apply(&self.ctx, &opts, self.scope, &plan, true) {
@@ -379,6 +510,7 @@ impl App {
             "done with skips".into()
         });
         self.log.extend(lines.iter().cloned());
+        self.failed |= !ok;
         self.marks.clear();
         self.refresh();
         self.screen = Screen::Result(lines);
@@ -519,12 +651,12 @@ fn table(app: &App) -> Table<'static> {
         }
     };
     let head = TableRow::new(vec![
-        Cell::from(" "),
-        Cell::from("#"),
-        Cell::from("component"),
-        Cell::from("kind"),
-        Cell::from(Span::styled("project", scope_style(Scope::Project))),
-        Cell::from(Span::styled("global", scope_style(Scope::Global))),
+        TableCell::from(" "),
+        TableCell::from("#"),
+        TableCell::from("component"),
+        TableCell::from("kind"),
+        TableCell::from(Span::styled("project", scope_style(Scope::Project))),
+        TableCell::from(Span::styled("global", scope_style(Scope::Global))),
     ])
     .style(Style::default().add_modifier(Modifier::BOLD));
     let rows: Vec<TableRow> = app
@@ -534,12 +666,12 @@ fn table(app: &App) -> Table<'static> {
         .map(|(i, r)| {
             let mark = app.marks.get(&r.name).map(|m| m.symbol()).unwrap_or(" ");
             TableRow::new(vec![
-                Cell::from(Span::styled(mark.to_owned(), accent())),
-                Cell::from(format!("{}", i + 1)),
-                Cell::from(r.name.clone()),
-                Cell::from(r.kind.clone()),
-                Cell::from(Span::styled(r.project.clone(), status_style(&r.project))),
-                Cell::from(Span::styled(r.global.clone(), status_style(&r.global))),
+                TableCell::from(Span::styled(mark.to_owned(), accent())),
+                TableCell::from(format!("{}", i + 1)),
+                TableCell::from(r.name.clone()),
+                TableCell::from(r.kind.clone()),
+                TableCell::from(Span::styled(r.project.clone(), status_style(&r.project))),
+                TableCell::from(Span::styled(r.global.clone(), status_style(&r.global))),
             ])
         })
         .collect();
@@ -559,12 +691,39 @@ fn table(app: &App) -> Table<'static> {
     .block(Block::bordered().title(" Components "))
 }
 
-fn popup(frame: &mut Frame, title: &str, lines: &[String], keys: &str) {
+/// Lines cut to `width` characters, so the popup knows how many rows it needs.
+fn wrap(lines: &[String], width: usize) -> Vec<String> {
+    let width = width.max(1);
+    let mut out = Vec::new();
+    for line in lines {
+        let chars: Vec<char> = line.chars().collect();
+        if chars.is_empty() {
+            out.push(String::new());
+        }
+        for chunk in chars.chunks(width) {
+            out.push(chunk.iter().collect());
+        }
+    }
+    out
+}
+
+/// A centred box with `lines` from `scroll` on, and `keys` at the bottom.
+/// Returns the wrapped line count and how many rows were visible.
+fn popup(
+    frame: &mut Frame,
+    title: &str,
+    lines: &[String],
+    keys: &str,
+    scroll: usize,
+) -> (usize, usize) {
     let area = frame.area();
     let width = area.width.saturating_sub(4).min(100);
-    let height = (lines.len() as u16 + 4)
+    let wrapped = wrap(lines, width.saturating_sub(2) as usize);
+    let height = (wrapped.len() as u16 + 4)
         .min(area.height.saturating_sub(2))
         .max(5);
+    let visible = height.saturating_sub(4) as usize;
+    let scroll = scroll.min(wrapped.len().saturating_sub(visible));
     let [v] = Layout::vertical([Constraint::Length(height)])
         .flex(Flex::Center)
         .areas(area);
@@ -572,15 +731,24 @@ fn popup(frame: &mut Frame, title: &str, lines: &[String], keys: &str) {
         .flex(Flex::Center)
         .areas(v);
     frame.render_widget(Clear, rect);
-    let mut text: Vec<Line> = lines.iter().map(|l| Line::from(l.clone())).collect();
+    let mut text: Vec<Line> = wrapped
+        .iter()
+        .skip(scroll)
+        .take(visible)
+        .map(|l| Line::from(l.clone()))
+        .collect();
     text.push(Line::from(""));
-    text.push(Line::from(Span::styled(keys.to_owned(), accent())));
+    let more = if scroll + visible < wrapped.len() {
+        format!("↓ {} more · ", wrapped.len() - scroll - visible)
+    } else {
+        String::new()
+    };
+    text.push(Line::from(Span::styled(format!("{more}{keys}"), accent())));
     frame.render_widget(
-        Paragraph::new(text)
-            .wrap(Wrap { trim: false })
-            .block(Block::bordered().title(format!(" {title} "))),
+        Paragraph::new(text).block(Block::bordered().title(format!(" {title} "))),
         rect,
     );
+    (wrapped.len(), visible)
 }
 
 const KEYS: &str = "↑↓ move · space/1-9 mark · u update · g scope · enter review · ? help · q quit";
@@ -650,18 +818,34 @@ pub fn draw(frame: &mut Frame, app: &App, logo: Option<&mut Logo>) {
 
     match &app.screen {
         Screen::List => {}
-        Screen::Review(lines) => popup(frame, "Plan", lines, "y apply · any other key back"),
-        Screen::Result(lines) => popup(frame, "Done", lines, "any key back · q quit"),
+        Screen::Review(review) => {
+            let keys = if app.dry_run {
+                "dry run: any key back"
+            } else if review.blocked.is_some() {
+                "can't apply: any key back"
+            } else {
+                "↑↓ scroll · y apply · any other key back"
+            };
+            let (total, visible) = popup(frame, "Plan", &review.lines, keys, review.scroll);
+            app.review_rows.set((total, visible));
+            if review.scroll.min(total.saturating_sub(visible)) + visible >= total {
+                app.review_seen_end.set(true);
+            }
+        }
+        Screen::Result(lines) => {
+            popup(frame, "Done", lines, "any key back · q quit", 0);
+        }
         Screen::Help => {
             let lines: Vec<String> = HELP.iter().map(|s| (*s).to_owned()).collect();
-            popup(frame, "Help", &lines, "any key back");
+            popup(frame, "Help", &lines, "any key back", 0);
         }
     }
 }
 
 /// Runs the UI until the user quits; the terminal is restored on every exit,
-/// including a panic. Returns the lines applied, for the scrollback.
-pub fn run(mut app: App) -> io::Result<Vec<String>> {
+/// including a panic. Returns the lines applied, for the scrollback, and
+/// whether everything applied could be done.
+pub fn run(mut app: App) -> io::Result<(Vec<String>, bool)> {
     let mut terminal: DefaultTerminal = ratatui::init();
     let mut logo = brand::Logo::detect();
     let result = (|| -> io::Result<()> {
@@ -674,7 +858,7 @@ pub fn run(mut app: App) -> io::Result<Vec<String>> {
         Ok(())
     })();
     ratatui::restore();
-    result.map(|()| app.log)
+    result.map(|()| (app.log, !app.failed))
 }
 
 #[cfg(test)]
@@ -707,7 +891,7 @@ mod tests {
         }
     }
 
-    fn app(f: &Fixture) -> App {
+    fn app_with(f: &Fixture, dry_run: bool) -> App {
         let source = Source::Embedded;
         let catalog = Catalog::parse(&source.catalog_text().unwrap());
         let ctx = Ctx {
@@ -723,17 +907,28 @@ mod tests {
             mode: Mode::Copy,
             harnesses: Vec::new(),
         };
-        App::new(ctx, opts, false, None)
+        App::new(ctx, opts, false, dry_run, None)
     }
 
-    fn press(app: &mut App, keys: &str) {
+    fn app(f: &Fixture) -> App {
+        app_with(f, false)
+    }
+
+    /// Each key after a draw, as the real loop does, on a terminal of `size`.
+    fn press_on(app: &mut App, keys: &str, size: (u16, u16)) {
         for c in keys.chars() {
+            screen(app, size.0, size.1);
             let code = match c {
                 '\n' => KeyCode::Enter,
+                '↓' => KeyCode::End,
                 c => KeyCode::Char(c),
             };
             app.on_key(KeyEvent::new(code, KeyModifiers::NONE));
         }
+    }
+
+    fn press(app: &mut App, keys: &str) {
+        press_on(app, keys, (100, 30));
     }
 
     fn row(app: &App, name: &str) -> usize {
@@ -756,7 +951,7 @@ mod tests {
 
     fn review_lines(app: &App) -> Vec<String> {
         match &app.screen {
-            Screen::Review(lines) => lines.clone(),
+            Screen::Review(review) => review.lines.clone(),
             other => panic!("not reviewing: {other:?}"),
         }
     }
@@ -866,5 +1061,74 @@ mod tests {
             assert!(text.contains(name), "{name} missing:\n{text}");
         }
         assert!(text.contains(brand::NAME));
+    }
+
+    #[test]
+    fn a_dry_run_never_applies() {
+        let f = fixture();
+        let mut app = app_with(&f, true);
+        let n = row(&app, "doc-sync");
+        press(&mut app, &format!("{n}\ny"));
+        assert_eq!(app.message, "Dry run: nothing changed.");
+        assert!(!f.project.join(".agents").exists());
+    }
+
+    #[test]
+    fn removing_what_a_marked_install_needs_is_blocked() {
+        let f = fixture();
+        let mut app = app(&f);
+        let review = row(&app, "code-review");
+        let reviewer = row(&app, "code-reviewer");
+        press(&mut app, &format!("{review}\ny"));
+        press(&mut app, &format!("\n{review}{reviewer}\ny"));
+        assert!(
+            app.message
+                .contains("code-review is needed by a component marked for install"),
+            "{}",
+            app.message
+        );
+        assert!(
+            !f.project.join(".claude/agents/code-reviewer.md").exists(),
+            "nothing applied"
+        );
+        assert!(f.project.join(".agents/skills/code-review").exists());
+    }
+
+    #[test]
+    fn a_plan_taller_than_the_terminal_must_be_scrolled_before_applying() {
+        let f = fixture();
+        let mut app = app(&f);
+        let reviewer = row(&app, "code-reviewer");
+        press(&mut app, &format!("{reviewer}\ny\n"));
+        let (adr, doc) = (row(&app, "adr-planning"), row(&app, "doc-sync"));
+        press_on(&mut app, &format!("{adr}{doc}{reviewer}\ny"), (80, 10));
+        assert!(
+            app.message.starts_with("Scroll to the end"),
+            "{}",
+            app.message
+        );
+        assert!(!f.project.join(".agents/skills/adr-planning").exists());
+        press_on(&mut app, "↓y", (80, 10));
+        assert!(f.project.join(".agents/skills/adr-planning").exists());
+        assert!(!f.project.join(".claude/agents/code-reviewer.md").exists());
+    }
+
+    #[test]
+    fn failures_are_reported_for_the_exit_status() {
+        let f = fixture();
+        let mut app = app(&f);
+        let n = row(&app, "doc-sync");
+        press(&mut app, &format!("{n}\ny\n"));
+        fs::write(
+            f.project.join(".agents/skills/doc-sync/SKILL.md"),
+            "edited\n",
+        )
+        .unwrap();
+        app.refresh();
+        press(&mut app, &format!("{n}\ny"));
+        assert!(
+            app.failed,
+            "a modified copy can't be removed without --force"
+        );
     }
 }

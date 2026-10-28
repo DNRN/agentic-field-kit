@@ -4,7 +4,7 @@ Date: 2026-10-28
 
 ## Status
 
-Accepted
+Accepted. The update path in the consequences ("`git pull` in the clone, then `install.sh --update`") is superseded by [0010](0010-components-embedded-in-binary.md): upgrade the installer, then `agentic-toolkit --update`. The manifest and the hash are unchanged.
 
 Plan: [selective install](../plans/selective-install.md). Related: [ADR 0006](0006-project-scope-install-default.md) (install scope), [ADR 0007](0007-component-catalog.md) (catalog).
 

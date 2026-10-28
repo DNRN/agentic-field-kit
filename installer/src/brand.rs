@@ -32,6 +32,23 @@ pub fn logo_fits(area: Rect) -> bool {
 
 fn truecolor() -> bool {
     env::var("COLORTERM").is_ok_and(|v| v == "truecolor" || v == "24bit")
+        || env::var_os("WT_SESSION").is_some()
+}
+
+/// Terminals known to answer the image-protocol query. ratatui-image's query
+/// leaves a thread reading stdin until the terminal answers, which would take
+/// keystrokes away from the UI in a terminal that never does.
+fn answers_graphics_query() -> bool {
+    let var = |k: &str| env::var(k).unwrap_or_default();
+    !var("KITTY_WINDOW_ID").is_empty()
+        || matches!(
+            var("TERM").as_str(),
+            "xterm-kitty" | "xterm-ghostty" | "foot" | "foot-extra"
+        )
+        || matches!(
+            var("TERM_PROGRAM").as_str(),
+            "iTerm.app" | "WezTerm" | "ghostty"
+        )
 }
 
 pub struct Logo {
@@ -40,21 +57,25 @@ pub struct Logo {
 
 impl Logo {
     /// The logo for this terminal: its image protocol (Kitty, Sixel, iTerm2)
-    /// if it has one, half-blocks on a truecolor terminal, otherwise none.
-    /// Never under `NO_COLOR`. Call after entering the alternate screen.
+    /// in terminals known to have one, half-blocks on a truecolor terminal,
+    /// otherwise none. Never under `NO_COLOR`. Call after entering the
+    /// alternate screen.
     pub fn detect() -> Option<Logo> {
         if env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()) {
             return None;
         }
-        // The query has a timeout, so a terminal that never answers can't hang startup.
-        let options = QueryStdioOptions {
-            timeout: Duration::from_millis(1000),
-            ..QueryStdioOptions::default()
+        let queried = if answers_graphics_query() {
+            let options = QueryStdioOptions {
+                timeout: Duration::from_millis(1000),
+                ..QueryStdioOptions::default()
+            };
+            Picker::from_query_stdio_with_options(options).ok()
+        } else {
+            None
         };
-        let picker = match Picker::from_query_stdio_with_options(options) {
-            Ok(p) if p.protocol_type() != ProtocolType::Halfblocks => p,
-            Ok(p) if truecolor() => p,
-            Err(_) if truecolor() => Picker::halfblocks(),
+        let picker = match queried {
+            Some(p) if p.protocol_type() != ProtocolType::Halfblocks => p,
+            _ if truecolor() => Picker::halfblocks(),
             _ => return None,
         };
         let image: DynamicImage =

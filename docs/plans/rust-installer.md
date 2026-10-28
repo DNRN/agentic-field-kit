@@ -132,9 +132,9 @@ Global symlinks need a folder to point into, and built-in components (ADR 0010) 
 
 **Change.**
 
-- `assets/brand/fox.svg`, copied unmodified from `entropyfox.com` (`site/static/img/fox.svg`); `assets/brand/fox.png`, rendered from it at the size the header needs, on transparent background; `assets/brand/render.sh` regenerates the PNG with `rsvg-convert`; `assets/brand/LICENSE` per ADR 0011. The root `LICENSE` and README state the exception.
-- The binary embeds the PNG and the name constant `Entropy Fox`. `ratatui-image` picks Kitty, Sixel, or iTerm2 when the terminal supports one, half-blocks on navy otherwise; hidden below 80×24, under `NO_COLOR`, or without truecolor (`COLORTERM`).
-- The terminal capability query has a timeout, so a terminal that never answers can't hang startup.
+- `assets/brand/fox.svg`, copied unmodified from `entropyfox.com` (`site/static/img/fox.svg`); `assets/brand/fox.png`, rendered from it on the brand navy `#144b74`; `assets/brand/render.sh` regenerates the PNG with `rsvg-convert`; `assets/brand/LICENSE` per ADR 0011, also shipped as `brand/` in every release archive. The root `LICENSE` and README state the exception.
+- The binary embeds the PNG and the name constant `Entropy Fox`. `ratatui-image` picks Kitty, Sixel, or iTerm2 in terminals known to answer its query (kitty, Ghostty, WezTerm, iTerm2, foot), half-blocks on navy on other truecolor terminals (`COLORTERM`, or Windows Terminal); hidden below 80×24 or under `NO_COLOR`.
+- The capability query is only sent to those terminals: ratatui-image leaves a thread reading stdin until the terminal answers, which would steal keystrokes from a terminal that never does.
 
 **Acceptance.** Screenshots in kitty (or WezTerm), a half-block terminal (for example GNOME Terminal), and Windows Terminal show the fox and the name; `NO_COLOR=1` shows the name only. `TestBackend` test: below 80×24 the name shows and the logo doesn't.
 

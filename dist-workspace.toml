@@ -24,3 +24,6 @@ pr-run-mode = "upload"
 # which dist can't parse; installer releases get their own tag, which also
 # keeps the plugin tag from starting this workflow.
 tag-namespace = "installer"
+# The binary embeds the Entropy Fox logo, which isn't MIT (ADR 0011); ship
+# its licence (and the logo files) in every archive.
+include = ["assets/brand/"]

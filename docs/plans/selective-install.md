@@ -1,6 +1,6 @@
 # Plan: selective, project-scoped installer
 
-> Built first in `install.sh`, then ported unchanged to the Rust installer before release ([Rust installer plan](rust-installer.md)); `install.sh` was removed in 0.2.0. The rules here still describe the installer's behaviour.
+> Built first in `install.sh`, then ported to the Rust installer before release ([Rust installer plan](rust-installer.md)); `install.sh` was removed in 0.2.0. The scopes, layout, statuses, safety rules, and update rules here still describe the installer. The command name, the bash menu, `--interactive`, and "`git pull` in the clone" do not: see the [README](../../README.md#install).
 
 Most users need one or two components from this repository, not all of them in every session. This plan turns `install.sh` into an installer that:
 

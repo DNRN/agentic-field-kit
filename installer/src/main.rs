@@ -335,13 +335,17 @@ fn main() -> ExitCode {
             return ExitCode::SUCCESS;
         }
         Command::Menu => {
-            let app = tui::App::new(ctx, opts, args.global, why);
+            let app = tui::App::new(ctx, opts, args.global, args.dry_run, why);
             return match tui::run(app) {
-                Ok(log) => {
+                Ok((log, ok)) => {
                     for line in log {
                         println!("{line}");
                     }
-                    ExitCode::SUCCESS
+                    if ok {
+                        ExitCode::SUCCESS
+                    } else {
+                        ExitCode::FAILURE
+                    }
                 }
                 Err(e) => die(&e.to_string()),
             };
