@@ -15,7 +15,7 @@ claude plugin eval . --trust-plugin --scaffold --allow-tools Bash Edit Write
 - `--scaffold` runs each case's `scaffold.sh`, which builds the scratch git repo the task works in. It runs as you, outside the sandbox; these scripts only write into the run's empty workspace.
 - `--allow-tools Bash Edit Write`: the cases read diffs with `git`, edit docs, and write ADRs. Bash runs in Claude Code's sandbox, which on Linux needs `bubblewrap` and `socat`.
 - Iterate on one case with one arm and one run: `--case doc-sync-renamed-flag --runs 1 --ablation none`. Filter by component with `--tag code-review`.
-- Cost: the default is 3 runs per arm, 78 agent runs for the suite. One run per arm (`--runs 1`, 26 runs) cost about $4 on 2026-10-23.
+- Cost: the default is 3 runs per arm, 84 agent runs for the suite. One run per arm (`--runs 1`, 28 runs) cost about $4 on 2026-10-23, when there were 26.
 - Results land in `evals/results/` (gitignored). The command exits 1 when any case scores below `--threshold` (default 1.0).
 
 ## Layout
@@ -41,9 +41,10 @@ evals/<component>/<case>/
 | | `new-flow-diagram` | New doc under `docs/` with exactly one mermaid diagram of submit → poll → fetch, linked from the index |
 | | `no-observable-change` | Internal rename: no doc edits, says why |
 | | `waived-check` | User waives the docs check: commits with `--no-verify`, never stamps docs |
-| adr-planning | `plan-feature` | Bootstraps `docs/adr/`, writes Proposed ADRs, plan references them |
+| adr-planning | `plan-feature` | Bootstraps `docs/adr/`, writes Proposed ADRs, plan references them, briefs each ADR and asks for a verdict |
 | | `existing-format` | Follows the project's ADR home, numbering, and sections |
 | | `contradiction` | Surfaces the conflict with an Accepted ADR and drafts a superseding one |
+| | `verdict` | Records a rejection and an acceptance in the Status sections; keeps the rejected ADR; follows up on the plan |
 | | `bug-fix` | Fixes a failing test without creating an ADR or loading the skill |
 
 ## Writing graders
@@ -58,6 +59,7 @@ evals/<component>/<case>/
 
 ## Known issues
 
+- **"a file in the plugin has more than one name (a hard link)"** on every case: cargo's `target/` (the installer's build output) is full of hard links, and the runner reads the whole plugin folder, ignored files included. Move it out for the run (`mv target ../target.aside`, then back), or build with `CARGO_TARGET_DIR` outside the repository.
 - **`git` is masked inside runs** (`permission denied: git`, exit 126), seen with Claude Code 2.1.288 and Arch's git, whose `/usr/lib/git-core` helpers are symlinks to `/usr/bin/git`. A normal sandboxed session runs git fine. Workaround: put a copy of the git binary in a directory you own outside `/tmp` and put it first on `PATH` (a copy under `/tmp` is masked too):
 
   ```bash

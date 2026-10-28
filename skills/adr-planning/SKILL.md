@@ -1,6 +1,6 @@
 ---
 name: adr-planning
-description: Use when planning or defining a new feature and architectural decisions arise - record each significant decision as an Architecture Decision Record (ADR) before implementation starts. Skip for bug fixes, chores, and choices with no lasting structural impact.
+description: Use when planning or defining a new feature and architectural decisions arise - record each significant decision as an Architecture Decision Record (ADR) before implementation starts, brief the user, and record their verdict. Also use when the user accepts, rejects, or wants to change a Proposed ADR. Skip for bug fixes, chores, and choices with no lasting structural impact.
 ---
 
 # ADR planning
@@ -42,7 +42,22 @@ Trivial choices - naming, formatting, single-file changes, library upgrades with
 
 6. **Record rejected alternatives** with the reason each was rejected. This is the core value: it prevents re-debating settled questions six months later.
 7. **Link both ways**: the feature plan references the ADR file; ADRs covering related decisions reference each other.
-8. **Leave status `Proposed`** until the user confirms the decision; flip to `Accepted` only on confirmation. Accepted ADRs are immutable - a change of direction means a new ADR marked `Superseded by NNNN`, and the old one updated to `Superseded by <new NNNN>`.
+8. **Leave status `Proposed`** and don't implement a decision while it is Proposed. Other work that doesn't depend on it can go ahead.
+9. **Brief the user and ask for a verdict** once the ADRs for the plan are written. Don't paste the files: a long record gets skimmed and approved unread. For each ADR, in a few lines:
+   - the decision, in one sentence;
+   - the strongest rejected alternative, and why it lost;
+   - what the user is signing up for: the costliest or hardest-to-reverse consequence;
+   - anything assumed or not verified that the decision rests on;
+   - the file path, for the full text.
+
+   Then ask, for all of them at once: **accept**, **change** (and what), or **reject**, per ADR. Use the harness's question tool if it has one; otherwise ask in plain text. Point out the ADR you would most expect them to push back on.
+10. **Record the verdict**:
+    - *Accept*: set the status to `Accepted`. Change nothing else.
+    - *Change*: edit the Proposed ADR, then brief only what changed and ask again.
+    - *Reject*: set the status to `Rejected` with the reason in one sentence, keep the file, and revise the plan. A rejected option is a decision too; the record stops it from being proposed again.
+    - No answer, or an answer that doesn't address the ADRs: they stay Proposed. If the user says to go ahead right after the brief, take it as accepting the ADRs in that brief and say so in the reply ("Recorded 0004 and 0005 as Accepted"), so a wrong reading can be caught.
+
+    Accepted ADRs are immutable - a change of direction means a new ADR marked `Superseded by NNNN`, and the old one updated to `Superseded by <new NNNN>`.
 
 ## Gotchas
 
