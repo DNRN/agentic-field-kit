@@ -54,7 +54,10 @@ fn raw_lines(root: &Path) -> io::Result<Vec<Vec<u8>>> {
             .map(<[u8]>::to_vec)
             .collect()),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(e) => Err(e),
+        Err(e) => Err(io::Error::new(
+            e.kind(),
+            format!("{}: {e}", file(root).display()),
+        )),
     }
 }
 
@@ -114,8 +117,9 @@ fn write_lines(root: &Path, lines: &[Vec<u8>]) -> io::Result<()> {
         bytes.push(b'\n');
     }
     let tmp = path.with_extension("tsv.tmp");
-    fs::write(&tmp, bytes)?;
-    fs::rename(&tmp, &path)
+    let named = |e: io::Error| io::Error::new(e.kind(), format!("{}: {e}", path.display()));
+    fs::write(&tmp, bytes).map_err(named)?;
+    fs::rename(&tmp, &path).map_err(named)
 }
 
 /// Replaces `name`'s row. Rows stay sorted by name (`LC_ALL=C sort -t TAB -k2,2`).
