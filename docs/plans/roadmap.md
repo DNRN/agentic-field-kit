@@ -69,7 +69,7 @@ Policies first where a declarative deny rule suffices (per `policies/README.md`)
 
 | Component | Type | Contents |
 | --- | --- | --- |
-| `AGENTS.md` base | rule | Points at `docs/adr/`, the commit-gate workflow, test and docs expectations; symlink instructions for `CLAUDE.md` / `GEMINI.md` |
+| `AGENTS.md` base | rule | Points at `docs/adr/`, the commit-gate workflow, test and docs expectations; how `CLAUDE.md` imports it (`@AGENTS.md`, as [`project-init`](../../skills/project-init/SKILL.md) sets up) and `GEMINI.md` symlinks to it |
 | Stack rules | rules | Short per-language conventions (`rules/python.md`, `rules/typescript.md`) |
 | `adr.md` | prompt | ADR template extracted from the adr-planning skill (single source; the skill links it) |
 | `plan.md`, `pr.md` | prompts | Feature plan and PR templates referencing ADRs |

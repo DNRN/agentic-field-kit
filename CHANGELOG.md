@@ -4,6 +4,10 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+### Added
+
+- `project-init` skill: starts a project. It runs `git init`, asks whether to connect a remote (connect one now, keep going while you create one, or stay local), writes `AGENTS.md` and a `CLAUDE.md` that imports it with `@AGENTS.md`, and writes `PROJECT.md` (purpose, users, scope, constraints, open questions) from a dialogue you can skip at any point. Run it again to answer the open questions later. Named `project-init`, not `init`, so it doesn't collide with the built-in `/init` in Claude Code, Codex, and Gemini CLI.
+
 ### Changed
 
 - `adr-planning` briefs each Proposed ADR in a few lines (decision, strongest rejected alternative, costliest consequence, assumptions, path) instead of pasting it, and asks you to accept, change, or reject each one. It records the verdict in the ADR's Status: `Accepted`, or `Rejected` with the reason, keeping the file. It no longer implements a decision while it is Proposed, and it now also triggers when you give a verdict on a Proposed ADR.
