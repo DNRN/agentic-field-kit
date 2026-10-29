@@ -69,7 +69,7 @@ Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#e
 
 ### Global install
 
-For a skill you want in every repository, such as `adr-planning`: `agentic-toolkit --global NAME`. Global installs are copies. With `--source DIR` they are symlinks into that toolkit folder instead, except on Windows, where copies stay the default (`--mode symlink` needs Developer Mode); `--mode` picks either, and `--update` keeps each install's form.
+For a skill you want in every repository, such as `adr-planning`, or one you use before a repository exists, such as `project-init`: `agentic-toolkit --global NAME`. Global installs are copies. With `--source DIR` they are symlinks into that toolkit folder instead, except on Windows, where copies stay the default (`--mode symlink` needs Developer Mode); `--mode` picks either, and `--update` keeps each install's form.
 
 | `--harness` | Target | Read by |
 | --- | --- | --- |

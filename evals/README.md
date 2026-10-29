@@ -15,7 +15,7 @@ claude plugin eval . --trust-plugin --scaffold --allow-tools Bash Edit Write
 - `--scaffold` runs each case's `scaffold.sh`, which builds the scratch git repo the task works in. It runs as you, outside the sandbox; these scripts only write into the run's empty workspace.
 - `--allow-tools Bash Edit Write`: the cases read diffs with `git`, edit docs, and write ADRs. Bash runs in Claude Code's sandbox, which on Linux needs `bubblewrap` and `socat`.
 - Iterate on one case with one arm and one run: `--case doc-sync-renamed-flag --runs 1 --ablation none`. Filter by component with `--tag code-review`.
-- Cost: the default is 3 runs per arm, 84 agent runs for the suite. One run per arm (`--runs 1`, 28 runs) cost about $4 on 2026-10-23, when there were 26.
+- Cost: the default is 3 runs per arm, 108 agent runs for the suite. One run per arm (`--runs 1`, 36 runs) cost about $4 on 2026-10-23, when there were 26.
 - Results land in `evals/results/` (gitignored). The command exits 1 when any case scores below `--threshold` (default 1.0).
 
 ## Layout
@@ -46,6 +46,10 @@ evals/<component>/<case>/
 | | `contradiction` | Surfaces the conflict with an Accepted ADR and drafts a superseding one |
 | | `verdict` | Records a rejection and an acceptance in the Status sections; keeps the rejected ADR; follows up on the plan |
 | | `bug-fix` | Fixes a failing test without creating an ADR or loading the skill |
+| project-init | `skip-dialogue` | Empty directory, user stays local and skips the questions: git repository, `AGENTS.md` pointing at `PROJECT.md`, `CLAUDE.md` importing `AGENTS.md`, open questions instead of guesses; no remote |
+| | `brief-given` | Brief given up front: `PROJECT.md` records the stated stack and non-goal and invents no technology |
+| | `existing-claude-md` | Rules in an existing `CLAUDE.md` move to `AGENTS.md`; `CLAUDE.md` imports it |
+| | `feature-request` | Feature work in a repository without `AGENTS.md`: adds the flag, creates no `AGENTS.md` or `PROJECT.md`, doesn't load the skill |
 
 ## Writing graders
 
