@@ -4,7 +4,7 @@ Date: 2026-10-28
 
 ## Status
 
-Accepted
+Accepted. "Never redrawn here" is superseded by [0012](0012-logo-drawn-as-text.md): the installer shows a hand-traced ASCII form of the logo, kept in `assets/brand/` under the same licence.
 
 Plan: [Rust installer](../plans/rust-installer.md). Related: [ADR 0009](0009-installer-in-rust.md).
 
