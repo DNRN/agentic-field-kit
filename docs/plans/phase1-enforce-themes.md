@@ -18,7 +18,7 @@ Unchanged: [ADR 0004](../adr/0004-configurable-docs-paths.md) (`.commit-gate-doc
 | P1 | `--pre-commit` mode and installed-name messages (done 2026-10-30) | P0 | 0013 | 1 |
 | P2 | One gate at a time (plugin defers to the git hook) (done 2026-10-30) | P1 | 0014 | 2 |
 | P3 | `hook` kind in the installer (done 2026-10-30; Windows CI pending) | P1 | 0014 | 3 |
-| P4 | `adr-guard` | P1 | 0015 | 4 |
+| P4 | `adr-guard` (done 2026-10-30) | P1 | 0015 | 4 |
 | P5 | `adr-index` SessionStart hook | — | — | 5 |
 | P6 | `ship` skill | P1 | — | 6 |
 | P7 | `adr-planning`: create and supersede on demand | — | — | 6 |
@@ -93,6 +93,16 @@ Code: `installer/src/githook.rs` (shim path, content, state), with the engine, s
 - Plugin `PreToolUse` on Edit/Write: deferred. It needs `python3` for the JSON and a reliable way to tell whether an `Edit`'s `old_string` falls inside the Status section. Revisit after P8 if Claude Code users ask for earlier feedback; the git check already holds.
 
 **Tests.** Edit an Accepted ADR's Context → denied; change only its Status to `Superseded by 0016` → allowed; add a note line under Status → allowed; edit a Proposed ADR → allowed; delete an Accepted ADR → denied; new ADR → allowed; a Status section that is missing or unparsable → allowed (fail open). Includes a CRLF ADR.
+
+**Done** (2026-10-30) in `hooks/scripts/commit-gate.sh`: `adr_violations`, with `accepted` and `without_status` in awk, so bash, git, and POSIX tools only. Decisions made while building it:
+
+- Accepted means the `HEAD` version's first non-blank line under `## Status` starts with `Accepted`, so partly superseded ADRs (`Accepted. Item 2 superseded by …`) stay guarded, and an ADR whose Status already reads `Superseded by …` is no longer guarded. That follows ADR 0015 as written.
+- Only `docs/adr/` itself, not subfolders, and only `NNNN-*.md` names; `docs/adr/README.md` is not an ADR.
+- Renaming out of `docs/adr/` shows as a deletion and is denied. The first commit of a repository (no `HEAD`) skips the check.
+- When review or docs are also pending, the denial prints both messages, review first; the ADR message has no stamp command.
+- The plugin mode does not run the ADR check. Without the git hook, Claude Code users get the skill's rule only, as before; running it there would need the worktree version for `git commit -a`.
+
+Tests: 25 checks in `tests/commit-gate.test.sh` ("adr-guard"), which also cover renames, a new Accepted ADR, `README.md` under `docs/adr/`, the `**Status:** Accepted` format (fails open), CRLF-to-LF conversion (not an edit), a combined review-and-ADR denial, and a first commit. Also replayed against this repository's own history: the Status-only change to ADR 0002 in P1 passes, and a body edit to ADR 0002 is denied.
 
 ## P5. `adr-index`
 

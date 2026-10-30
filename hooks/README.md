@@ -33,3 +33,5 @@ README.md
 ```
 
 Everything outside these paths is code. The list decides whether a commit touched docs, whether the repo has docs at all (no match means the docs check is off), and which edits leave a review stamp valid. Changing the list invalidates existing docs stamps.
+
+**Accepted ADRs are immutable** ([ADR 0015](../docs/adr/0015-accepted-adrs-guarded-at-commit.md)). The git hook mode also denies a commit that changes `docs/adr/NNNN-*.md` outside its `## Status` section when the `HEAD` version's Status starts with `Accepted`, and one that deletes or renames such an ADR. Status edits (`Superseded by NNNN`, notes, links), new ADRs, and Proposed or Rejected ADRs pass; carriage returns don't count. There is no stamp: the answer is a superseding ADR, or `--no-verify`. One denial lists every failing check. An ADR whose Status isn't a `## Status` heading followed by a line starting `Accepted` isn't recognised, and passes. Only the git hook checks ADRs; the plugin mode doesn't.
