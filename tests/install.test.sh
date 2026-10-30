@@ -128,7 +128,8 @@ check "project: the named component is recorded as explicit" row "$P" "code-revi
 check "project: nothing written outside the project" [ ! -e "$HOME/.agents/skills/code-review" ]
 check "project: listed as installed" [ "$(cd "$P" && st project code-review)" = installed ]
 check "project: not installed is -" [ "$(cd "$P" && st project doc-sync)" = - ]
-check "project: hooks are plugin only (n/a)" [ "$(cd "$P" && st project commit-gate)" = n/a ]
+check "project: a hook can be installed (-)" [ "$(cd "$P" && st project commit-gate)" = - ]
+check "global: hooks are per repository (n/a)" [ "$(cd "$P" && st global commit-gate)" = n/a ]
 (cd "$P" && "$I" code-review >/dev/null)
 check "project: naming an installed requirement makes it explicit" row "$P" "code-review${TAB}explicit"
 (cd "$P" && "$I" --remove code-reviewer >/dev/null)
@@ -268,8 +269,8 @@ check "a manifest row that claims no valid path claims nothing" [ "$(st project 
 
 P=$(project unavailable)
 cd "$P" || exit 1
-"$I" commit-gate >/dev/null 2>&1; rc=$?
-check "naming a component that can't be installed here fails and installs nothing" holds '[ "$rc" -ne 0 ] && [ ! -e "$P/.agents" ]'
+"$I" --global commit-gate >/dev/null 2>&1; rc=$?
+check "naming a component that can't be installed here fails and installs nothing" holds '[ "$rc" -ne 0 ] && [ ! -e "$P/.agents" ] && [ ! -e "$HOME/.agents/hooks" ]'
 
 "$I" code-reviewer adr-planning >/dev/null
 echo "local edit" >> "$P/.claude/agents/code-reviewer.md"
@@ -321,6 +322,56 @@ check "both scopes: --list warns" bash -c "cd '$P' && '$I' --list | grep -q '! i
 out=$(cd "$P" && "$I" code-review doc-sync </dev/null 2>&1)
 check "both scopes: install warns" grep -q "also installed globally" <<<"$out"
 "$I" --global --remove >/dev/null
+
+# ---- hook kind: commit-gate as a git pre-commit hook (ADR 0014) -------------------
+P=$(project hook)
+cd "$P" || exit 1
+git config user.email t@t; git config user.name t
+echo a > code.py; echo d > README.md; git add -A; git commit -qm init
+out="$("$I" commit-gate 2>&1)"
+check "hook: plan lists the copy and the shim" holds 'printf "%s" "$out" | grep -q "copy    .agents/hooks/commit-gate.sh" && printf "%s" "$out" | grep -q "hook    .git/hooks/pre-commit"'
+check "hook: copy is committed with the project" [ -f "$P/.agents/hooks/commit-gate.sh" ]
+check "hook: manifest records the copy only" holds 'grep -q "^hook${TAB}commit-gate${TAB}.*${TAB}\.agents/hooks/commit-gate\.sh\$" "$P/.agents/agentic-toolkit.tsv"'
+check "hook: requirements come along" [ -d "$P/.agents/skills/code-review" ]
+check "hook: shim is executable and marked" holds '[ -x "$P/.git/hooks/pre-commit" ] && grep -qx "# agentic-toolkit commit-gate" "$P/.git/hooks/pre-commit"'
+check "hook: listed as installed" [ "$(st project commit-gate)" = installed ]
+git add -A; git commit -q --no-verify -m "add toolkit"
+echo b >> code.py; git add code.py
+git commit -qm unreviewed 2>"$TMP/err"; rc=$?
+check "hook: a real unreviewed git commit is denied" holds '[ "$rc" -ne 0 ] && grep -q "commit-gate: Pending" "$TMP/err"'
+check "hook: the denial names the project's skill and copy" holds 'grep -q "run the code-review skill" "$TMP/err" && grep -q "/.agents/hooks/commit-gate.sh --stamp-review" "$TMP/err"'
+bash .agents/hooks/commit-gate.sh --stamp-review >/dev/null; bash .agents/hooks/commit-gate.sh --stamp-docs >/dev/null
+git commit -qm reviewed; rc=$?
+check "hook: stamps from the installed copy unblock it" [ "$rc" -eq 0 ]
+rm .git/hooks/pre-commit
+check "hook: a deleted shim is inactive" [ "$(st project commit-gate)" = inactive ]
+"$I" --update >/dev/null
+check "hook: --update restores the shim" holds '[ -x "$P/.git/hooks/pre-commit" ] && [ "$(st project commit-gate)" = installed ]'
+"$I" --remove commit-gate code-review doc-sync >/dev/null
+check "hook: --remove removes copy and shim" holds '[ ! -e "$P/.agents/hooks" ] && [ ! -e "$P/.git/hooks/pre-commit" ]'
+
+P=$(project hook-foreign)
+cd "$P" || exit 1
+printf '#!/bin/sh\nnpx lint-staged\n' > .git/hooks/pre-commit; chmod +x .git/hooks/pre-commit
+cp .git/hooks/pre-commit "$TMP/foreign-pre-commit"
+out="$("$I" --force commit-gate 2>&1)"; rc=$?
+check "hook: a foreign pre-commit hook is never overwritten, even with --force" cmp -s .git/hooks/pre-commit "$TMP/foreign-pre-commit"
+check "hook: ... the copy is installed and the line to add is shown, exit 0" holds '[ "$rc" -eq 0 ] && [ -f .agents/hooks/commit-gate.sh ] && printf "%s" "$out" | grep -qF "|| bash .agents/hooks/commit-gate.sh --pre-commit || exit 1"'
+check "hook: ... and it is inactive" [ "$(st project commit-gate)" = inactive ]
+echo '[ ! -f .agents/hooks/commit-gate.sh ] || bash .agents/hooks/commit-gate.sh --pre-commit || exit 1' >> .git/hooks/pre-commit
+check "hook: the added line makes it installed" [ "$(st project commit-gate)" = installed ]
+"$I" --remove --yes >/dev/null
+check "hook: --remove keeps the foreign hook" holds 'grep -q lint-staged .git/hooks/pre-commit && [ ! -e .agents/hooks ]'
+git config user.email t@t; git config user.name t; echo x > f; git add f
+git commit -qm "after remove" 2>/dev/null; rc=$?
+check "hook: the added line fails open once the copy is gone" [ "$rc" -eq 0 ]
+
+P=$(project hook-path)
+cd "$P" || exit 1
+git config core.hooksPath .husky
+"$I" commit-gate >/dev/null
+check "hook: core.hooksPath decides where the shim goes" holds '[ -x "$P/.husky/pre-commit" ] && [ ! -e "$P/.git/hooks/pre-commit" ]'
+cd "$TMP" || exit 1
 
 # ---- --source paths, usage errors -----------------------------------------------
 (cd "$TMP" && "$BIN" --source ./home/../toolkit --global --mode symlink adr-planning >/dev/null)

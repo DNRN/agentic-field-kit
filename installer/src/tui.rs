@@ -17,6 +17,7 @@ use ratatui::{DefaultTerminal, Frame};
 
 use crate::brand;
 use crate::engine::{self, Action, Options};
+use crate::githook::{self, State};
 use crate::list;
 use crate::manifest;
 use crate::scope::{Scope, detected_harnesses, plugin_on};
@@ -284,9 +285,15 @@ impl App {
                     .ctx
                     .component(&row.name)
                     .is_some_and(|c| c.harnesses == "plugin");
+                let hook = self
+                    .ctx
+                    .component(&row.name)
+                    .is_some_and(|c| c.kind == "hook");
                 self.message = if plugin_only {
+                    format!("{}: ships with the Claude Code plugin only", row.name)
+                } else if hook {
                     format!(
-                        "{}: plugin only until roadmap phase 1 (portable commit gate)",
+                        "{}: git hooks are per repository; install it in a project",
                         row.name
                     )
                 } else {
@@ -312,7 +319,7 @@ impl App {
             .filter(|r| {
                 matches!(
                     self.status(r).as_str(),
-                    "outdated" | "missing" | "dangling" | "retired"
+                    "outdated" | "missing" | "dangling" | "retired" | "inactive"
                 )
             })
             .map(|r| r.name.clone())
@@ -564,7 +571,7 @@ fn status_style(status: &str) -> Style {
     let fg = |c| themed(Style::default().fg(c), Style::default());
     match status {
         "installed" | "linked" => fg(GREEN),
-        "outdated" | "missing" | "dangling" => fg(YELLOW),
+        "outdated" | "missing" | "dangling" | "inactive" => fg(YELLOW),
         "modified" | "retired" | "foreign" => fg(RED),
         "plugin" => fg(BLUE),
         _ => Style::default().add_modifier(Modifier::DIM),
@@ -728,6 +735,31 @@ fn details(app: &App) -> Text<'static> {
         )));
         for p in paths {
             lines.push(Line::from(format!("  {}", engine::disp(app.scope, &p))));
+        }
+    }
+    if app.scope == Scope::Project
+        && let (Some(c), Some(root)) = (ctx.component(&row.name), ctx.root.as_deref())
+        && c.kind == "hook"
+        && c.harnesses != "plugin"
+    {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled("Git hook", title())));
+        let st = githook::state(root, &row.name);
+        let shown = st
+            .path()
+            .map(|p| githook::disp(root, p))
+            .unwrap_or_default();
+        let text = match &st {
+            State::NoRepo => "  not a git repository".to_owned(),
+            State::Absent(_) => format!("  {shown}: not there yet"),
+            State::Ours(_) if st.enabled() => format!("  {shown}: runs it"),
+            State::Ours(_) => format!("  {shown}: not executable"),
+            State::Runs(_) => format!("  {shown} (yours): runs it"),
+            State::Foreign(_) => format!("  {shown} is not ours. Add:"),
+        };
+        lines.push(Line::from(text));
+        if matches!(st, State::Foreign(_)) {
+            lines.push(Line::from(format!("  {}", githook::line_to_add(&row.name))));
         }
     }
     Text::from(lines)
@@ -1150,17 +1182,54 @@ mod tests {
     }
 
     #[test]
-    fn the_hook_says_why_it_cant_be_selected() {
+    fn the_hook_installs_into_the_project_with_its_shim() {
         let f = fixture();
         let mut app = app(&f);
         let n = row(&app, "commit-gate");
-        press(&mut app, &n.to_string());
+        press(&mut app, &format!("{n}\n"));
+        let lines = review_lines(&app);
+        assert!(
+            lines.contains(&"  copy    .agents/hooks/commit-gate.sh".to_owned()),
+            "{lines:?}"
+        );
+        assert!(
+            lines.contains(&"  hook    .git/hooks/pre-commit".to_owned()),
+            "{lines:?}"
+        );
+        press(&mut app, "y");
+        assert!(!app.failed, "{:?}", app.log);
+        assert!(f.project.join(".agents/hooks/commit-gate.sh").is_file());
+        assert!(f.project.join(".git/hooks/pre-commit").is_file());
+        assert_eq!(app.rows[n - 1].project, "installed");
+    }
+
+    #[test]
+    fn the_hook_says_why_it_cant_be_global() {
+        let f = fixture();
+        let mut app = app(&f);
+        let n = row(&app, "commit-gate");
+        press(&mut app, &format!("g{n}"));
         assert!(app.marks.is_empty());
         assert!(
-            app.message.contains("plugin only until roadmap phase 1"),
+            app.message.contains("git hooks are per repository"),
             "{}",
             app.message
         );
+    }
+
+    #[test]
+    fn an_inactive_hook_is_marked_by_update() {
+        let f = fixture();
+        let mut app = app(&f);
+        let n = row(&app, "commit-gate");
+        press(&mut app, &format!("{n}\ny\n"));
+        fs::remove_file(f.project.join(".git/hooks/pre-commit")).unwrap();
+        app.refresh();
+        assert_eq!(app.rows[n - 1].project, "inactive");
+        press(&mut app, "u\ny");
+        assert!(!app.failed, "{:?}", app.log);
+        assert!(f.project.join(".git/hooks/pre-commit").is_file());
+        assert_eq!(app.rows[n - 1].project, "installed");
     }
 
     #[test]

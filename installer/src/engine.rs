@@ -9,6 +9,7 @@ use std::io;
 use std::path::Path;
 
 use crate::catalog::Component;
+use crate::githook::{self, State};
 use crate::hash;
 use crate::manifest;
 use crate::scope::{Scope, plugin_on};
@@ -137,6 +138,7 @@ pub fn layout(ctx: &Ctx, opts: &Options, scope: Scope, name: &str) -> Vec<String
             paths
         }
         (Scope::Project, "agent") => vec![format!(".claude/agents/{name}.md")],
+        (Scope::Project, "hook") if c.harnesses != "plugin" => vec![githook::copy_path(name)],
         (Scope::Global, "skill") => {
             let harnesses: Vec<&str> = if opts.harnesses.is_empty() {
                 vec!["agents"]
@@ -263,10 +265,12 @@ fn plan_write(
             );
         }
         _ => {
-            let note = if ctx.component(name).is_some_and(|c| c.harnesses == "plugin") {
-                "plugin only until roadmap phase 1 (portable commit gate)"
-            } else {
-                "not available in this scope"
+            let note = match ctx.component(name) {
+                Some(c) if c.harnesses == "plugin" => "ships with the Claude Code plugin only",
+                Some(c) if c.kind == "hook" => {
+                    "git hooks are per repository: install it in a project"
+                }
+                _ => "not available in this scope",
             };
             return plan.skip(name, note);
         }
@@ -440,7 +444,7 @@ pub fn plan_update(
         let st = ctx.status(scope, n);
         match st.as_str() {
             "installed" | "linked" => plan.ok(n, "up to date"),
-            "outdated" | "missing" | "dangling" => plan.add(
+            "outdated" | "missing" | "dangling" | "inactive" => plan.add(
                 Verb::Write,
                 n,
                 &reason_of(root, n),
@@ -603,6 +607,44 @@ pub fn plan_remove(
     Ok(plan)
 }
 
+fn is_project_hook(ctx: &Ctx, scope: Scope, name: &str) -> bool {
+    scope == Scope::Project && ctx.component(name).is_some_and(|c| c.kind == "hook")
+}
+
+/// The plan line for a hook's `pre-commit` shim, when installing (`remove`
+/// false) or removing it.
+fn shim_line(root: &Path, name: &str, remove: bool) -> Option<String> {
+    let st = githook::state(root, name);
+    let shown = st
+        .path()
+        .map(|p| githook::disp(root, p))
+        .unwrap_or_default();
+    if remove {
+        return match st {
+            State::Ours(_) => Some(format!("  {:<7} {shown}", "remove")),
+            State::Runs(_) => Some(format!(
+                "  {:<7} {shown}  (not ours: its {name} line now does nothing; remove it yourself)",
+                "keep"
+            )),
+            _ => None,
+        };
+    }
+    match st {
+        State::NoRepo => Some(format!(
+            "  {:<7} pre-commit: not a git repository, so the hook is not enabled",
+            "skip"
+        )),
+        State::Absent(_) => Some(format!("  {:<7} {shown}", "hook")),
+        State::Ours(_) if !st.enabled() => Some(format!("  {:<7} {shown}", "hook")),
+        State::Foreign(_) => Some(format!(
+            "  {:<7} {shown}  (not ours: add `{}` to it)",
+            "skip",
+            githook::line_to_add(name)
+        )),
+        State::Ours(_) | State::Runs(_) => None,
+    }
+}
+
 /// The plan as the command line prints it. `can_ask_remove`: removals the user
 /// didn't name will happen (confirmation or `--yes`).
 pub fn show(
@@ -619,7 +661,7 @@ pub fn show(
             Verb::Write => {
                 let update = matches!(
                     s.note.as_str(),
-                    "outdated" | "modified" | "missing" | "dangling"
+                    "outdated" | "modified" | "missing" | "dangling" | "inactive"
                 );
                 for p in &s.paths {
                     let how = if update {
@@ -636,6 +678,9 @@ pub fn show(
                     };
                     out.push(format!("  {how:<7} {}{req}", disp(scope, p)));
                 }
+                if is_project_hook(ctx, scope, &s.name) {
+                    out.extend(shim_line(root, &s.name, false));
+                }
             }
             Verb::Remove | Verb::AskRemove => {
                 if s.verb == Verb::AskRemove && !can_ask_remove {
@@ -651,6 +696,9 @@ pub fn show(
                     };
                     for p in &s.paths {
                         out.push(format!("  {:<7} {}{note}", "remove", disp(scope, p)));
+                    }
+                    if is_project_hook(ctx, scope, &s.name) {
+                        out.extend(shim_line(root, &s.name, true));
                     }
                 }
             }
@@ -716,6 +764,7 @@ fn with_path(path: &Path, e: io::Error) -> io::Error {
 fn tidy(root: &Path) {
     for d in [
         ".agents/skills",
+        ".agents/hooks",
         ".agents",
         ".claude/skills",
         ".claude/agents",
@@ -777,6 +826,26 @@ fn write_component(
     )
 }
 
+/// Writes the hook's `pre-commit` shim unless a hook is there that the
+/// installer didn't write (ADR 0014): that one is reported, never changed.
+fn enable_hook(root: &Path, name: &str, done: &mut Applied) -> io::Result<()> {
+    match githook::state(root, name) {
+        State::Absent(p) | State::Ours(p) => {
+            githook::write_shim(&p, name).map_err(|e| with_path(&p, e))?;
+        }
+        State::Runs(_) => {}
+        State::Foreign(p) => done.messages.push(format!(
+            "{name}: {} is not ours, so it was left alone. To enable {name}, add this line to it:\n    {}",
+            githook::disp(root, &p),
+            githook::line_to_add(name)
+        )),
+        State::NoRepo => done.messages.push(format!(
+            "{name}: not a git repository, so the hook is not enabled; run agentic-toolkit --update after git init"
+        )),
+    }
+    Ok(())
+}
+
 /// Carries out the plan. `can_ask_remove` as for [`show`].
 pub fn apply(
     ctx: &Ctx,
@@ -800,6 +869,9 @@ pub fn apply(
                 };
                 write_component(ctx, opts, scope, root, c, s)?;
                 done.wrote.push(s.name.clone());
+                if is_project_hook(ctx, scope, &s.name) {
+                    enable_hook(root, &s.name, &mut done)?;
+                }
             }
             Verb::Remove | Verb::AskRemove => {
                 if s.verb == Verb::AskRemove && !can_ask_remove {
@@ -808,6 +880,12 @@ pub fn apply(
                 for p in &s.paths {
                     let full = root.join(p);
                     remove_any(&full).map_err(|e| with_path(&full, e))?;
+                }
+                // The shim goes with the copy; a hook someone else wrote stays.
+                if is_project_hook(ctx, scope, &s.name)
+                    && let State::Ours(hook) = githook::state(root, &s.name)
+                {
+                    remove_any(&hook).map_err(|e| with_path(&hook, e))?;
                 }
                 if let Some(row) = manifest::row(root, &s.name) {
                     let left: Vec<String> = row
@@ -986,6 +1064,141 @@ mod tests {
             !f.project.join(".agents").exists(),
             "manifest and empty folders are removed"
         );
+    }
+
+    fn hook_file(f: &Fixture) -> PathBuf {
+        f.project.join(".git/hooks/pre-commit")
+    }
+
+    #[test]
+    fn a_hook_installs_its_copy_and_shim() {
+        let f = fixture();
+        let ctx = ctx(&f);
+        install(&ctx, Scope::Project, &["commit-gate"]);
+        assert!(f.project.join(".agents/hooks/commit-gate.sh").is_file());
+        assert_eq!(
+            fs::read_to_string(hook_file(&f)).unwrap(),
+            githook::shim("commit-gate")
+        );
+        let row = manifest::row(&f.project, "commit-gate").unwrap();
+        assert_eq!(row.paths(), [".agents/hooks/commit-gate.sh"]);
+        assert_eq!(ctx.status(Scope::Project, "commit-gate"), "installed");
+        assert_eq!(ctx.status(Scope::Project, "code-review"), "installed");
+    }
+
+    #[test]
+    fn a_missing_shim_is_inactive_and_update_restores_it() {
+        let f = fixture();
+        let ctx = ctx(&f);
+        install(&ctx, Scope::Project, &["commit-gate"]);
+        fs::remove_file(hook_file(&f)).unwrap();
+        assert_eq!(ctx.status(Scope::Project, "commit-gate"), "inactive");
+        let plan = plan_update(&ctx, &copy_opts(), Scope::Project, &[]).unwrap();
+        let shown = show(&ctx, &copy_opts(), Scope::Project, &plan, false);
+        assert!(
+            shown.contains(&"  hook    .git/hooks/pre-commit".to_owned()),
+            "{shown:?}"
+        );
+        apply(&ctx, &copy_opts(), Scope::Project, &plan, false).unwrap();
+        assert_eq!(ctx.status(Scope::Project, "commit-gate"), "installed");
+    }
+
+    #[test]
+    fn an_edited_copy_is_modified_before_inactive() {
+        let f = fixture();
+        let ctx = ctx(&f);
+        install(&ctx, Scope::Project, &["commit-gate"]);
+        fs::remove_file(hook_file(&f)).unwrap();
+        fs::write(f.project.join(".agents/hooks/commit-gate.sh"), "mine\n").unwrap();
+        assert_eq!(ctx.status(Scope::Project, "commit-gate"), "modified");
+    }
+
+    #[test]
+    fn a_foreign_pre_commit_hook_is_never_changed() {
+        let f = fixture();
+        let ctx = ctx(&f);
+        fs::create_dir_all(hook_file(&f).parent().unwrap()).unwrap();
+        fs::write(hook_file(&f), "#!/bin/sh\nnpx lint-staged\n").unwrap();
+        let names = ["commit-gate".to_owned()];
+        let opts = Options {
+            force: true,
+            ..copy_opts()
+        };
+        let plan = plan_install(&ctx, &opts, Scope::Project, &names, false).unwrap();
+        let shown = show(&ctx, &opts, Scope::Project, &plan, true);
+        assert!(
+            shown
+                .iter()
+                .any(|l| l.starts_with("  skip    .git/hooks/pre-commit  (not ours: add `")),
+            "{shown:?}"
+        );
+        let done = apply(&ctx, &opts, Scope::Project, &plan, true).unwrap();
+        assert!(!done.skipped);
+        assert!(
+            done.messages
+                .iter()
+                .any(|m| m.contains(&githook::line_to_add("commit-gate")))
+        );
+        assert_eq!(
+            fs::read_to_string(hook_file(&f)).unwrap(),
+            "#!/bin/sh\nnpx lint-staged\n"
+        );
+        assert_eq!(ctx.status(Scope::Project, "commit-gate"), "inactive");
+        let plan = plan_remove(&ctx, &copy_opts(), Scope::Project, &names).unwrap();
+        apply(&ctx, &copy_opts(), Scope::Project, &plan, true).unwrap();
+        assert!(!f.project.join(".agents/hooks/commit-gate.sh").exists());
+        assert_eq!(
+            fs::read_to_string(hook_file(&f)).unwrap(),
+            "#!/bin/sh\nnpx lint-staged\n"
+        );
+    }
+
+    #[test]
+    fn removing_a_hook_removes_its_shim() {
+        let f = fixture();
+        let ctx = ctx(&f);
+        install(&ctx, Scope::Project, &["commit-gate"]);
+        let names = ["commit-gate".to_owned()];
+        let plan = plan_remove(&ctx, &copy_opts(), Scope::Project, &names).unwrap();
+        let shown = show(&ctx, &copy_opts(), Scope::Project, &plan, true);
+        assert!(
+            shown.contains(&"  remove  .git/hooks/pre-commit".to_owned()),
+            "{shown:?}"
+        );
+        apply(&ctx, &copy_opts(), Scope::Project, &plan, true).unwrap();
+        assert!(!hook_file(&f).exists());
+        assert!(!f.project.join(".agents/hooks").exists());
+    }
+
+    #[test]
+    fn a_hook_is_refused_globally() {
+        let f = fixture();
+        let ctx = ctx(&f);
+        let names = ["commit-gate".to_owned()];
+        let plan = plan_install(&ctx, &copy_opts(), Scope::Global, &names, false).unwrap();
+        assert!(plan.skipped);
+        assert!(plan.steps[0].note.contains("per repository"));
+    }
+
+    #[test]
+    fn a_hook_row_claims_only_its_own_copy() {
+        let f = fixture();
+        manifest::put(
+            &f.project,
+            "hook",
+            "commit-gate",
+            "0.2.0",
+            "x",
+            "explicit",
+            &[
+                ".agents/hooks/other.sh".to_owned(),
+                ".git/hooks/pre-commit".to_owned(),
+                ".agents/hooks/commit-gate.sh".to_owned(),
+            ],
+        )
+        .unwrap();
+        let row = manifest::row(&f.project, "commit-gate").unwrap();
+        assert_eq!(row.paths(), [".agents/hooks/commit-gate.sh"]);
     }
 }
 

@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::catalog::{Catalog, Component};
+use crate::githook;
 use crate::hash;
 use crate::manifest;
 use crate::scope::{self, Scope, plugin_on};
@@ -24,7 +25,14 @@ pub const GLOBAL_TARGETS: [&str; 3] = [".agents/skills", ".claude/skills", ".omp
 pub fn is_ours(status: &str) -> bool {
     matches!(
         status,
-        "installed" | "linked" | "outdated" | "modified" | "missing" | "dangling" | "retired"
+        "installed"
+            | "linked"
+            | "outdated"
+            | "modified"
+            | "missing"
+            | "dangling"
+            | "retired"
+            | "inactive"
     )
 }
 
@@ -51,6 +59,7 @@ impl Ctx {
                 format!(".claude/skills/{name}"),
             ],
             (Scope::Project, "agent") => vec![format!(".claude/agents/{name}.md")],
+            (Scope::Project, "hook") if c.harnesses != "plugin" => vec![githook::copy_path(name)],
             (Scope::Global, "skill") => GLOBAL_TARGETS
                 .iter()
                 .map(|t| format!("{t}/{name}"))
@@ -66,6 +75,8 @@ impl Ctx {
         };
         match (scope, c.kind.as_str()) {
             (_, "skill") => "",
+            // Git hooks are per repository: project scope only (ADR 0014).
+            (Scope::Project, "hook") if c.harnesses != "plugin" => "",
             (Scope::Project, "agent") => {
                 if self.root.as_deref().is_some_and(plugin_on) {
                     "plugin"
@@ -195,7 +206,15 @@ impl Ctx {
         } else if links == paths.len() {
             "linked"
         } else if legacy || self.source_hash(name).as_deref() == Some(mhash.as_str()) {
-            "installed"
+            // A hook's copy only runs once git's pre-commit hook calls it.
+            if scope == Scope::Project
+                && self.catalog.get(name).is_some_and(|c| c.kind == "hook")
+                && !githook::state(root, name).enabled()
+            {
+                "inactive"
+            } else {
+                "installed"
+            }
         } else {
             "outdated"
         };

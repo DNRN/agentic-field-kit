@@ -56,16 +56,17 @@ Where a project install puts things ([ADR 0006](docs/adr/0006-project-scope-inst
 | `.agents/skills/<name>/` | Codex, Gemini CLI, OpenCode, Cursor, omp |
 | `.claude/skills/<name>/` | Claude Code. Left out when the project's `.claude/settings.json` enables the plugin, which already provides the skills |
 | `.claude/agents/<name>.md` | Claude Code subagents; same condition |
+| `.agents/hooks/<name>.sh` | Git, through the clone's `pre-commit` hook: the commit gate, in every harness and in a terminal ([ADR 0014](docs/adr/0014-git-hook-layout.md)) |
 | `.agents/agentic-toolkit.tsv` | The installer: what it installed, why, and a content hash of each ([ADR 0008](docs/adr/0008-project-install-manifest.md)) |
 
-**Updating.** Install the new release the same way, then run `agentic-toolkit --update` in each project ([ADR 0010](docs/adr/0010-components-embedded-in-binary.md)). Components have no version numbers of their own. `--list` compares each copy with the hash recorded at install time and with the installer's: `outdated` (changed in the new release), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it). The installer never touches a file it didn't install (`foreign`).
+**Updating.** Install the new release the same way, then run `agentic-toolkit --update` in each project ([ADR 0010](docs/adr/0010-components-embedded-in-binary.md)). Components have no version numbers of their own. `--list` compares each copy with the hash recorded at install time and with the installer's: `outdated` (changed in the new release), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it), `inactive` (a hook whose copy is current but that git doesn't run in this clone yet). The installer never touches a file it didn't install (`foreign`).
 
 Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#evidence)):
 
 - Gemini CLI loads project skills only in a [trusted folder](https://geminicli.com/docs/cli/trusted-folders/). Gemini CLI and Cursor find them only when started at the repository root.
 - A skill installed both in the project and globally: Codex lists it twice, Claude Code and Cursor use the global copy. `--list` flags it, and a project install offers to remove the global copy.
 - With the plugin enabled at user scope, Claude Code lists a project `code-review` next to the plugin's `agentic-toolkit:code-review`. Enable the plugin for the project instead, or install only the plugin.
-- `commit-gate` ships only with the plugin until the portable gate ([roadmap phase 1](docs/plans/roadmap.md#phase-1-enforce-existing-themes)) lands.
+- `commit-gate` (`agentic-toolkit commit-gate`) copies the gate to `.agents/hooks/commit-gate.sh` and writes a small `pre-commit` hook in this clone that runs it, where git looks for hooks (`core.hooksPath` counts). `.git/` isn't committed, so each teammate runs `agentic-toolkit --update` once after cloning; until then `--list` says `inactive`. A `pre-commit` hook the installer didn't write (husky, the pre-commit framework, your own) is never changed: the installer prints a line to add to it. The gate asks before unreviewed commits from any harness and from a terminal; `git commit --no-verify` skips it. With the plugin enabled too, you are asked once.
 
 ### Global install
 

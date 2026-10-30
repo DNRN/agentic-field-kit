@@ -17,7 +17,7 @@ Unchanged: [ADR 0004](../adr/0004-configurable-docs-paths.md) (`.commit-gate-doc
 | P0 | This plan; ADRs 0013–0015 accepted (done 2026-10-30) | — | 0013–0015 | 1 |
 | P1 | `--pre-commit` mode and installed-name messages (done 2026-10-30) | P0 | 0013 | 1 |
 | P2 | One gate at a time (plugin defers to the git hook) (done 2026-10-30) | P1 | 0014 | 2 |
-| P3 | `hook` kind in the installer | P1 | 0014 | 3 |
+| P3 | `hook` kind in the installer (done 2026-10-30; Windows CI pending) | P1 | 0014 | 3 |
 | P4 | `adr-guard` | P1 | 0015 | 4 |
 | P5 | `adr-index` SessionStart hook | — | — | 5 |
 | P6 | `ship` skill | P1 | — | 6 |
@@ -72,6 +72,17 @@ Covered in `tests/commit-gate.test.sh` ("one gate at a time"): also `commit -a` 
 - `tests/install.test.sh`: install writes copy, manifest row, and executable shim; a real `git commit` is then gated; deleting the shim → `not enabled`, `--update` restores it; foreign hook untouched, reported; `core.hooksPath` set → shim lands there; `--remove` removes copy and shim, keeps a foreign hook; global install refused.
 - TUI `TestBackend`: the hook can be marked and its plan lists the shim.
 - CI on Linux, macOS, Windows. Windows: the shim runs under Git for Windows' `sh`; the test commits through `git` in Git Bash.
+
+**Done** (2026-10-30). Built as above, with these differences:
+
+- The status word is `inactive`, not `not enabled`. `--list` and the UI have 9-character status columns, and `tests/install.test.sh` reads `--list` by whitespace-separated field; a two-word status breaks both. ADR 0014's decision is unchanged.
+- The line to add to a foreign hook fails open: `[ ! -f .agents/hooks/commit-gate.sh ] || bash .agents/hooks/commit-gate.sh --pre-commit || exit 1`. ADR 0014's example (`bash … || exit 1`) would block every commit once the component was removed, since bash exits 127 on a missing file. The plugin's detection still matches it.
+- A foreign hook that already has the line counts as enabled (`installed`); `--remove` then keeps that hook and the plan says its line now does nothing.
+- Without `git` on PATH, the shim path falls back to `.git/hooks/pre-commit` when `.git` is a folder.
+- Marking an `inactive` hook in the UI removes it, like any installed component; `u` marks it for update, which writes the shim.
+- A plugin-only `hook` row (P5's `adr-index`) stays uninstallable: the `hook` kind needs `harnesses` other than `plugin`.
+
+Code: `installer/src/githook.rs` (shim path, content, state), with the engine, status, manifest, list, and UI changes. Tests: 7 engine and 4 `githook` unit tests, 3 UI tests (replacing "the hook says why it can't be selected"), and 19 `hook:` checks in `tests/install.test.sh`, which include real `git commit` runs against the installed gate.
 
 ## P4. `adr-guard`
 
