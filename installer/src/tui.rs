@@ -1260,22 +1260,37 @@ mod tests {
     }
 
     #[test]
-    fn the_screen_fits_80_by_24() {
+    fn at_80_by_24_the_logo_shows_and_the_table_scrolls() {
         let f = fixture();
-        let app = app(&f);
+        let mut app = app(&f);
         let text = screen(&app, 80, 24);
-        for name in [
-            "adr-planning",
-            "code-review",
-            "doc-sync",
-            "code-reviewer",
-            "doc-auditor",
-            "commit-gate",
-        ] {
-            assert!(text.contains(name), "{name} missing:\n{text}");
-        }
         assert!(text.contains(brand::NAME));
         assert!(text.contains(FOX_LINE), "no logo at 80×24:\n{text}");
+        // ADR 0012: the table keeps 7 component rows beside the logo.
+        for name in app.rows.iter().take(7).map(|r| r.name.clone()) {
+            assert!(text.contains(&name), "{name} missing:\n{text}");
+        }
+        // The rest scroll into view with the cursor.
+        press_on(&mut app, "↓", (80, 24));
+        let text = screen(&app, 80, 24);
+        let last = app.rows.last().unwrap().name.clone();
+        assert!(text.contains(&last), "{last} missing after End:\n{text}");
+    }
+
+    #[test]
+    fn a_taller_screen_shows_every_row_with_the_logo() {
+        let f = fixture();
+        let app = app(&f);
+        let height = brand::LOGO_HEIGHT + app.rows.len() as u16 + 5;
+        let text = screen(&app, 80, height);
+        assert!(text.contains(FOX_LINE));
+        for r in &app.rows {
+            assert!(
+                text.contains(&r.name),
+                "{} missing at 80×{height}:\n{text}",
+                r.name
+            );
+        }
     }
 
     /// A line of the logo that nothing else on the screen draws.

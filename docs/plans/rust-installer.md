@@ -137,7 +137,7 @@ Global symlinks need a folder to point into, and built-in components (ADR 0010) 
 - `assets/brand/fox.svg`, copied unmodified from `entropyfox.com` (`site/static/img/fox.svg`); `assets/brand/fox.txt`, the logo as 41×12 ASCII traced by hand from it, and `assets/brand/fox.colors`, one shade letter per character ([ADR 0012](../adr/0012-logo-drawn-as-text.md)); `assets/brand/LICENSE` per ADR 0011, also shipped as `brand/` in every release archive. The root `LICENSE` and README state the exception.
 - The binary embeds both text files and the name constant `Entropy Fox`. Shades are xterm 256-colour indices (no truecolor needed), mid tones that show on dark and light backgrounds; under `NO_COLOR` the characters alone. Hidden below 80×24.
 
-**Acceptance.** The fox and the name show in a 256-colour terminal at 80×24 with every component row visible; `NO_COLOR=1` shows the fox uncoloured. `TestBackend` tests: at 80×24 the logo and every component row show; at 79×24 and 120×23 the name shows and the logo doesn't. Unit tests: every character of `fox.txt` has a shade in `fox.colors` and the logo fits 41×12; `logo` draws every character, in its shade or, plain, in none.
+**Acceptance.** The fox and the name show in a 256-colour terminal at 80×24 with every component row visible (with 9 components, since phase 1: 7 rows, the rest scroll; see [phase 1 P5](phase1-enforce-themes.md#p5-adr-index)); `NO_COLOR=1` shows the fox uncoloured. `TestBackend` tests: at 80×24 the logo and every component row show; at 79×24 and 120×23 the name shows and the logo doesn't. Unit tests: every character of `fox.txt` has a shade in `fox.colors` and the logo fits 41×12; `logo` draws every character, in its shade or, plain, in none.
 
 ## R5. Releases with dist
 
