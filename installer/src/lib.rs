@@ -7,6 +7,7 @@ pub mod brand;
 pub mod catalog;
 pub mod check;
 pub mod engine;
+pub mod githook;
 pub mod hash;
 pub mod list;
 pub mod manifest;

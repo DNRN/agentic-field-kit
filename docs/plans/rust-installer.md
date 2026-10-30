@@ -170,5 +170,5 @@ Setup guides per tool and harness as `docs/guides/*.md`, built into the binary l
 
 ## Out of scope
 
-- `commit-gate` outside the plugin ([selective install S5](selective-install.md#s5-commit-gate-outside-the-plugin)), still waiting for roadmap phase 1.
+- `commit-gate` outside the plugin ([selective install S5](selective-install.md#s5-commit-gate-outside-the-plugin)): done in [roadmap phase 1](phase1-enforce-themes.md#p3-hook-kind-in-the-installer), the `hook` kind.
 - Self-update (`agentic-toolkit self update`), Homebrew, Scoop, and package signing: after 0.3.0, if users ask.

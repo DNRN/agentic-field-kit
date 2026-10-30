@@ -230,6 +230,8 @@ Components have no version numbers of their own (ADR 0008).
 
 **Acceptance.** Before roadmap phase 1, `commit-gate` can't be selected outside the plugin, and the menu says why.
 
+**Done** (2026-10-30) in [phase 1 P3](phase1-enforce-themes.md#p3-hook-kind-in-the-installer): the `hook` kind installs the gate into a project, and the catalog row's `harnesses` is `all`.
+
 ## S6. Docs and release
 
 **Change.**

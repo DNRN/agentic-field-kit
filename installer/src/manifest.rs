@@ -29,6 +29,7 @@ impl Row {
             format!(".claude/skills/{n}"),
             format!(".omp/agent/skills/{n}"),
             format!(".claude/agents/{n}.md"),
+            crate::githook::copy_path(n),
         ];
         self.raw_paths
             .split_whitespace()

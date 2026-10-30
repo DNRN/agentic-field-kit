@@ -10,7 +10,7 @@ Least portable category: hook event models and config formats differ per harness
 - Reference bundled scripts via `"${CLAUDE_PLUGIN_ROOT}"/hooks/scripts/<script>.sh` — never absolute local paths.
 - Hooks must be idempotent and safe when the tool state is unexpected; they run on every matching event.
 - Every hook ships with regression tests in `tests/<script>.test.sh` (JSON on stdin, decision on stdout); run `tests/run.sh`.
-- Every hook script has a row in [`catalog.tsv`](../catalog.tsv) (`harnesses` is `plugin` while it ships only with the Claude Code plugin); `tests/run.sh` fails without one.
+- Every hook script has a row in [`catalog.tsv`](../catalog.tsv) (`harnesses` is `plugin` when it ships only with the Claude Code plugin, `all` when the installer's `hook` kind installs it as a git hook); `tests/run.sh` fails without one.
 
 ## commit-gate.sh
 
@@ -19,7 +19,7 @@ Gate on `git commit`: asks the user before an unreviewed commit, or one that cha
 **Two modes, one script.**
 
 - *Plugin mode* (JSON on stdin): the Claude Code `PreToolUse` hook wired in `hooks.json`. Parses the Bash command with `parse-commit.py`; denies with JSON.
-- *Git hook mode* (`commit-gate.sh --pre-commit`): run by a `pre-commit` hook, so it gates commits from every harness and from a terminal. Bash and git only. Checks the staged diff (git has already staged `git commit -a`), prints the reason on stderr prefixed `commit-gate:`, and exits 1. When the commit uses `-a`, the message names the `--all` stamp. The installer's `hook` kind will write the hook ([ADR 0014](../docs/adr/0014-git-hook-layout.md)); until then, enable it by hand: copy the script to `.agents/hooks/commit-gate.sh` and add `bash .agents/hooks/commit-gate.sh --pre-commit || exit 1` to the `pre-commit` hook.
+- *Git hook mode* (`commit-gate.sh --pre-commit`): run by a `pre-commit` hook, so it gates commits from every harness and from a terminal. Bash and git only. Checks the staged diff (git has already staged `git commit -a`), prints the reason on stderr prefixed `commit-gate:`, and exits 1. When the commit uses `-a`, the message names the `--all` stamp. `agentic-toolkit commit-gate` installs it ([ADR 0014](../docs/adr/0014-git-hook-layout.md)): a committed copy at `.agents/hooks/commit-gate.sh`, and a `pre-commit` shim in the clone, marked `# agentic-toolkit commit-gate`, that runs the copy and allows the commit when the copy is missing. An existing `pre-commit` hook is never changed; add `[ ! -f .agents/hooks/commit-gate.sh ] || bash .agents/hooks/commit-gate.sh --pre-commit || exit 1` to it instead, which also fails open without the copy.
 
 Both modes check the same stamps in `.git/` and the same docs paths, and `--no-verify` skips both. **One gate at a time:** the plugin mode allows the commit when git's `pre-commit` hook (`git rev-parse --git-path hooks/pre-commit`, so `core.hooksPath` counts) is executable, names `agents/hooks/commit-gate.sh`, and that copy exists. The git hook then asks, so a user with both is asked once. The message names the skills and stamp command as installed: `the code-review skill` and `.agents/hooks/commit-gate.sh` when the project has those copies, `/agentic-toolkit:code-review` and the script's own path otherwise.
 

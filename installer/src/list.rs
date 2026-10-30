@@ -70,7 +70,7 @@ pub fn table(ctx: &Ctx, why: Option<&str>) -> String {
             Some(c) => {
                 let mut notes = match c.harnesses.as_str() {
                     "claude" => "Claude Code only".to_owned(),
-                    "plugin" => "plugin only until roadmap phase 1".to_owned(),
+                    "plugin" => "ships with the Claude Code plugin only".to_owned(),
                     _ => String::new(),
                 };
                 if !c.requires.is_empty() {
