@@ -257,5 +257,39 @@ if [ "$rc" -eq 0 ] && [ -z "$out" ]; then echo "ok   outside a repository: silen
 out="$(cd "$REPO" && git reset -q && env -i PATH=/usr/bin:/bin bash "$GATE" --pre-commit 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then echo "ok   nothing staged: silent allow"; else echo "FAIL nothing staged: rc=$rc out=$out"; fails=$((fails + 1)); fi
 
+echo "# one gate at a time"
+# install_copy: the project's copy of the gate, as the installer writes it.
+install_copy() { mkdir -p "$REPO/.agents/hooks"; cp "$GATE" "$REPO/.agents/hooks/commit-gate.sh"; }
+# write_hook <path> <content>: an executable pre-commit hook.
+write_hook() { mkdir -p "$(dirname "$1")"; printf '%b' "$2" > "$1"; chmod +x "$1"; }
+PRE_COMMIT_SHIM='#!/bin/sh\n# agentic-toolkit commit-gate\ngate="$(git rev-parse --show-toplevel)/.agents/hooks/commit-gate.sh"\n[ -f "$gate" ] || exit 0\nexec bash "$gate" --pre-commit\n'
+new_repo; stage code.py; install_copy
+expect deny "copy without a git hook: plugin still asks" "git commit -m x"
+write_hook "$REPO/.git/hooks/pre-commit" "$PRE_COMMIT_SHIM"
+expect allow "shim installed: plugin defers to the git hook" "git commit -m x"
+expect allow "shim installed: commit -a also deferred" "git commit -am x"
+expect allow "shim installed: --no-verify still allowed" "git commit --no-verify -m x"
+expect allow "shim installed: deferred from a subdirectory" "git commit -m x" "$REPO/sub"
+expect_commit denied "plugin and git hook together: the git hook asks" -m x
+expect_last "commit-gate: Pending" "the one ask comes from the git hook"
+chmod -x "$REPO/.git/hooks/pre-commit"
+expect deny "shim not executable (git skips it): plugin asks" "git commit -m x"
+chmod +x "$REPO/.git/hooks/pre-commit"
+rm "$REPO/.agents/hooks/commit-gate.sh"
+expect deny "shim without the copy (shim fails open): plugin asks" "git commit -m x"
+install_copy
+write_hook "$REPO/.git/hooks/pre-commit" '#!/bin/sh\nnpx lint-staged\n'
+expect deny "foreign pre-commit hook: plugin asks" "git commit -m x"
+write_hook "$REPO/.git/hooks/pre-commit" '#!/bin/sh\nnpx lint-staged\nbash .agents/hooks/commit-gate.sh --pre-commit || exit 1\n'
+expect allow "foreign hook with the one-line addition: plugin defers" "git commit -m x"
+rm "$REPO/.git/hooks/pre-commit"
+git -C "$REPO" config core.hooksPath .husky
+write_hook "$REPO/.husky/pre-commit" 'bash .agents/hooks/commit-gate.sh --pre-commit || exit 1\n'
+expect allow "core.hooksPath (relative) is honoured" "git commit -m x"
+git -C "$REPO" config core.hooksPath "$WORK/abs-hooks"
+expect deny "core.hooksPath elsewhere: .husky hook no longer runs, plugin asks" "git commit -m x"
+write_hook "$WORK/abs-hooks/pre-commit" "$PRE_COMMIT_SHIM"
+expect allow "core.hooksPath (absolute) is honoured" "git commit -m x"
+
 [ "$fails" -eq 0 ] && echo "commit-gate: all passed" || echo "commit-gate: $fails failed"
 [ "$fails" -eq 0 ]
