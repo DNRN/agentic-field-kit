@@ -22,7 +22,7 @@ Unchanged: [ADR 0004](../adr/0004-configurable-docs-paths.md) (`.commit-gate-doc
 | P5 | `adr-index` SessionStart hook (done 2026-10-30) | — | — | 5 |
 | P6 | `ship` skill (done 2026-10-30) | P1 | — | 6 |
 | P7 | `adr-planning`: create and supersede on demand (done 2026-10-30) | — | — | 6 |
-| P8 | Docs, CHANGELOG, release 0.3.0 | P1–P7 | — | 7 |
+| P8 | Docs, CHANGELOG, release 0.3.0 (done 2026-10-30; tags after merge) | P1–P7 | — | 7 |
 
 P5 and P7 depend on nothing and can go in parallel with P1–P4.
 
@@ -139,6 +139,8 @@ The catalog now has 9 components. At 80×24 the terminal UI keeps the fox, as AD
 - ADR 0002's Status gains "consequence on harness coverage superseded by 0013".
 - CHANGELOG 0.3.0: Added — git `pre-commit` gate, `hook` kind, `adr-guard`, `adr-index`, `ship`, ADR create/supersede. Changed — gate messages name the skills as installed; plugin gate defers to the git hook.
 - Release as in the installer plan: `claude plugin tag --push`, `git tag installer/v0.3.0`.
+
+**Done** (2026-10-30). Most items landed with the change they describe (S5, the installer plan's out-of-scope line, ADR 0002's Status, `hooks/README.md`, `why-adrs.md`). This step added: a components table and a "The commit gate" section in the README (what stops a commit, `--no-verify`, `--update` per clone, the line for an existing hook, one gate with the plugin); hooks in the compatibility table; `ship` and the git hook in `why-code-review.md`; the CHANGELOG as 0.3.0 (the new project flow from [its plan](new-project.md) ships in it too); versions 0.3.0 in `plugin.json`, `installer/Cargo.toml`, and `Cargo.lock`. The tags wait for the merge to `main`.
 
 ## Acceptance
 

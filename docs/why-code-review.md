@@ -35,13 +35,14 @@ The pattern underneath: agentic coding makes writing cheap and review the bottle
 1. You ask: invoke the skill (`/agentic-toolkit:code-review` in Claude Code, your harness's skill invocation elsewhere), optionally with a target: `staged`, `worktree`, a branch, a ref range; defaults to the staged diff.
 2. The agent offers: per the skill, before committing completed work it proposes a review first.
 3. The gate asks: an unreviewed `git commit` is denied with instructions for the agent to ask you.
+4. You ship: "ship it" runs the `ship` skill, which reviews, checks the docs, writes the message, and commits.
 
 **The gated commit flow:**
 
-1. Agent runs `git commit` → hook denies: *unreviewed changes*, and the denial tells the agent to ask you.
+1. Agent runs `git commit` → the gate denies it: *unreviewed changes*, and the message tells the agent to ask you. In Claude Code with the plugin that is a hook denial; everywhere else the commit fails with a `commit-gate:` message from git's `pre-commit` hook.
 2. You say yes → review runs (subagent where available), you get a findings table and a verdict.
    - `fix then commit` → blockers/majors get fixed, touched hunks re-reviewed.
    - `approve` → the reviewed diff is stamped and the commit passes.
 3. You say no → the agent commits with `--no-verify`. One conscious skip, no ceremony.
 
-**Limits, on purpose.** The stamp records one reviewed diff — stage anything new and the gate asks again. `git commit -a` is checked against the whole worktree diff, so its stamp is `--stamp-review --all`; the denial message names the right command. The gate fail-opens (missing python3, corrupted input, not a repo, unparseable command) because a wedged commit is worse than an unreviewed one. And `--no-verify` always works: this mechanism makes skipping visible, not impossible.
+**Limits, on purpose.** The stamp records one reviewed diff — stage anything new and the gate asks again. `git commit -a` is checked against the whole worktree diff, so its stamp is `--stamp-review --all`; the denial message names the right command. The gate fail-opens (not a repo, a git error, and in the Claude Code hook a missing python3, corrupted input, or an unparseable command) because a wedged commit is worse than an unreviewed one. And `--no-verify` always works: this mechanism makes skipping visible, not impossible.
