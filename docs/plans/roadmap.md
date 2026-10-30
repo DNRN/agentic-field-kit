@@ -11,19 +11,41 @@ flowchart LR
   P4 --> P5[Phase 5: rules, prompts, output styles]
 ```
 
-Phase 1 comes first because it turns rules the model must remember into deterministic behavior. Phases 2 and 3 are independent. Phase 4 builds on the hook infrastructure and CI from the [design plan](design-improvements.md). Phase 5 is packaging.
+Phase 1 comes first because it turns rules the model must remember into deterministic behavior. Phases 2 and 3 are independent. Phase 4 builds on the hook infrastructure and CI from the [design plan](design-improvements.md) and on the installer's `hook` kind from phase 1. Phase 5 is packaging.
 
 ## Phase 1: enforce existing themes
 
+**Starting point.** Components are installed by the `agentic-toolkit` binary, which embeds them ([ADR 0009](../adr/0009-installer-in-rust.md), [ADR 0010](../adr/0010-components-embedded-in-binary.md)), records each install in the manifest ([ADR 0008](../adr/0008-project-install-manifest.md)), and reads `catalog.tsv` ([ADR 0007](../adr/0007-component-catalog.md)). The engine installs the `skill` and `agent` kinds only. `commit-gate` is a Claude Code `PreToolUse` hook that ships with the plugin; its catalog row says `plugin`, and installing it in a project is deferred to this phase ([selective install S5](selective-install.md#s5-commit-gate-outside-the-plugin)). Its review and docs stamps live in `.git/`, so any gate that git runs can read them.
+
 | Component | Type | What it does | ADR |
 | --- | --- | --- | --- |
-| Portable commit gate | git `pre-commit` hook + installer | Same review/docs checks as `commit-gate.sh`, installed as a git hook, so the gate works in every harness (all agents run git); denial text reaches the agent via stderr; `--no-verify` keeps its git meaning | new — supersedes ADR 0002's "Claude Code only" consequence |
-| `adr-guard` | PreToolUse hook (Edit/Write) | Denies edits to an ADR whose status is `Accepted`, except the `Superseded by` status line | new — turns a skill rule into enforcement |
-| `adr-index` | SessionStart hook | Injects Accepted ADR titles and paths (one line each) into context so every session knows the decisions exist | — |
-| `ship` | skill (explicit invocation) | Code review → doc sync → commit message → commit, in one explicit flow; reuses existing skills. A skill, not a command, so it works in every harness ([ADR 0005](../adr/0005-rubrics-live-in-skills.md)) | — |
-| `adr` (create, accept, supersede) | skill (explicit invocation) | Create an ADR on demand; accept or supersede one with both records updated. Could extend `adr-planning` instead of adding a skill | — |
+| Portable commit gate | git `pre-commit` hook | Same review/docs checks as `commit-gate.sh`, run by git, so the gate works in every harness (all agents run git). Reads the same `.git/` stamps and `.commit-gate-docs`. Denial text on stderr reaches the agent and tells it to ask the user; `--no-verify` keeps its git meaning. Git runs it only for commits, so it needs no `parse-commit.py`: bash and git only (Git for Windows ships bash). Fails open | new — supersedes ADR 0002's "Claude Code only" consequence |
+| `hook` kind | installer | `agentic-toolkit commit-gate` installs the git hook into the project, records it in the manifest, and `--update`, `--remove`, `--list`, and the UI treat it like any other kind. The catalog row's `harnesses` becomes `all`. Never overwrites an existing `pre-commit` hook (husky, pre-commit framework, hand-written); it reports and stops, or chains when the user agrees. Closes S5 | new — where the hook lives and how it coexists with other hooks |
+| Gate names what is installed | gate | The denial message and stamp command name the skills as installed: `/agentic-toolkit:code-review` with the plugin, `code-review` in a project install. The stamp command works without the plugin path (for example the installed hook run with `--stamp-review`); `code-review` and `doc-sync` follow whatever the message says | — |
+| One gate at a time | gate | With the plugin and the git hook both present, the user is asked once: the plugin's `PreToolUse` gate allows when the git hook is installed | — |
+| `adr-guard` | check in the git hook; optional `PreToolUse` (Edit/Write) in the plugin | Denies a commit that changes an `Accepted` ADR anywhere except its Status line (`Superseded by …`). The git check works in every harness; the plugin hook gives earlier feedback in Claude Code | new — turns a skill rule into enforcement |
+| `adr-index` | SessionStart hook (plugin) | Injects Accepted ADR titles and paths (one line each) into context so every session knows the decisions exist. Other harnesses rely on `AGENTS.md` pointing at `docs/adr/` ([`project-init`](../../skills/project-init/SKILL.md) writes it) | — |
+| `ship` | skill (explicit invocation) | Code review → doc sync → commit message → commit, in one explicit flow; reuses existing skills and stamps as it goes, so the gate passes. A skill, not a command, so it works in every harness ([ADR 0005](../adr/0005-rubrics-live-in-skills.md)) | — |
+| `adr` (create, supersede) | extend `adr-planning` | `adr-planning` already records accept and reject verdicts. Add creating an ADR on demand and superseding one with both records updated, instead of a second ADR skill | — |
 
-**Acceptance.** Gate fires from Codex/Cursor/OpenCode commits (manual check per harness); editing an Accepted ADR is denied; a new session can list Accepted ADRs without reading `docs/adr/`.
+**Decisions before implementation** (through [adr-planning](../../skills/adr-planning/SKILL.md); the next free number is 0013):
+
+- Where the installed hook lives. `.git/hooks/pre-commit` is per clone and not committed, so every clone runs `agentic-toolkit --update`. A committed `.agents/hooks/pre-commit` with `core.hooksPath` is shared but still needs per-clone config and replaces the repository's other hooks.
+- How the manifest records a file outside the working tree (`.git/hooks/`), and what `--check` and the UI show when a clone lacks it.
+- How the plugin gate detects the git hook (a marker line in the hook, or the manifest row).
+
+**Order.** ADRs → portable gate script (shares its checks with `commit-gate.sh` rather than copying them) → `hook` kind in the engine, status, manifest, and UI → gate messages and one-gate rule → `adr-guard` → `adr-index` → `ship` and the `adr-planning` extension.
+
+**Every component** has a `catalog.tsv` row (`tests/catalog.test.sh` fails without one), plugin wiring in `hooks/hooks.json` where it is a Claude Code hook, and updates to the README, `hooks/README.md`, and the CHANGELOG. Hooks and checks get deterministic tests in `tests/` (fail open on unexpected input, silent on success). Skills get eval cases under `evals/`: a golden task and a negative case.
+
+**Acceptance.**
+
+- Gate fires from Codex/Cursor/OpenCode commits (manual check per harness) and from a plain `git commit` in a terminal; a skill stamp unblocks it; `--no-verify` bypasses it.
+- `agentic-toolkit commit-gate` installs the hook in a project, `--update` restores a deleted hook, `--remove` removes it, an existing `pre-commit` hook is never overwritten, and `--list` no longer shows `commit-gate` as plugin-only. Covered by installer tests on Linux, macOS, and Windows CI.
+- With the plugin and the git hook both installed, one unreviewed commit asks once.
+- Committing an edit to an Accepted ADR is denied; changing only its Status to `Superseded by NNNN` is allowed.
+- A new Claude Code session can list Accepted ADRs without reading `docs/adr/`.
+- `ship` and the `adr-planning` extension pass `agentic-toolkit --check --source .` and their evals.
 
 ## Phase 2: workflow skills
 
