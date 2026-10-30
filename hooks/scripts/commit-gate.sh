@@ -3,10 +3,14 @@
 # checks before `git commit`. One gate, one combined ask, independent waivers.
 #
 # Modes:
-#   (stdin JSON)      gate mode: decide whether the attempted Bash command
-#                     (a git commit) may proceed. Denies with a reason listing
-#                     the pending check(s) and telling the agent to ask the
-#                     user before committing.
+#   (stdin JSON)      plugin mode: Claude Code PreToolUse hook. Decide whether
+#                     the attempted Bash command (a git commit) may proceed.
+#                     Denies with a reason listing the pending check(s) and
+#                     telling the agent to ask the user before committing.
+#   --pre-commit      git hook mode: run by git's pre-commit hook in every
+#                     harness and terminal. Checks the staged diff (git has
+#                     already staged `commit -a` into its index), prints the
+#                     same reason on stderr, and exits 1. See docs/adr/0013.
 #   --stamp-review [--all] [dir]  record the reviewed diff in .git/review-stamp
 #   --stamp-docs   [--all] [dir]  record the documentation-checked code diff in
 #                                 .git/doc-stamp
@@ -30,9 +34,13 @@
 # Commit detection lives in parse-commit.py (chains, cd, git -C, git global
 # options, combined short flags, sh -c, heredocs).
 #
+# Messages name the skills and the stamp command as installed: the project's
+# copies (.agents/skills/<name>, .agents/hooks/commit-gate.sh) when present,
+# the plugin's otherwise.
+#
 # Design: fail-open. Any unexpected state (no stdin, no python3, not a repo,
 # parse error, git error) allows the commit. This is a nudge, not enforcement:
-# `--no-verify` always bypasses. See docs/adr/0002, 0003, and 0004.
+# `--no-verify` always bypasses. See docs/adr/0002, 0003, 0004, and 0013.
 set -u
 
 SCRIPT_PATH="$0"
@@ -97,7 +105,97 @@ case "${1:-}" in
   --stamp-docs)   shift; stamp_mode --stamp-docs   doc-stamp    "$@" ;;
 esac
 
-# --- gate mode --------------------------------------------------------------
+# pending_checks <top> <git-dir> <diff-kind>: set review_pending and
+# docs_pending (yes/no). Returns 1 when there is nothing to check: an empty
+# diff (allow-empty commits, merge continuations, nothing staged) or any git
+# error (e.g. `commit -a` before the first commit), so callers fail open.
+pending_checks() {
+  local top="$1" git_dir="$2" kind="$3" full_hash code_hash docs_touched
+  load_docs "$top"
+  git -C "$top" diff "$kind" --quiet 2>/dev/null
+  [ $? -eq 1 ] || return 1
+
+  { IFS= read -r full_hash; IFS= read -r code_hash || code_hash=""; } <<EOF
+$(diff_hashes "$top" "$kind")
+EOF
+  [ "${#full_hash}" -ge 8 ] || return 1  # hash failed -> fail open
+
+  docs_touched=no
+  if [ -n "$(git -C "$top" diff "$kind" --name-only -- "${DOCS[@]}" 2>/dev/null)" ]; then
+    docs_touched=yes
+  fi
+
+  # Review: pending unless the full or the code-only hash is stamped.
+  review_pending=yes
+  if stamped "$git_dir" review-stamp "$full_hash" || { [ -n "$code_hash" ] && stamped "$git_dir" review-stamp "$code_hash"; }; then
+    review_pending=no
+  fi
+
+  # Docs: pending when code changed, no doc did, the repo has docs, and the
+  # code-only hash is not stamped.
+  docs_pending=no
+  if [ -n "$code_hash" ] && [ "$docs_touched" = no ]; then
+    if git -C "$top" ls-files -- "${DOCS[@]}" 2>/dev/null | grep -q .; then
+      docs_pending=yes
+      stamped "$git_dir" doc-stamp "$code_hash" && docs_pending=no
+    fi
+  fi
+  return 0
+}
+
+stamped() { [ -f "$1/$2" ] && grep -qxF -e "$3" "$1/$2" 2>/dev/null; }
+
+# skill_ref <top> <name>: how to invoke a skill, as installed.
+skill_ref() {
+  if [ -d "$1/.agents/skills/$2" ]; then
+    printf 'the %s skill' "$2"
+  else
+    printf '/agentic-toolkit:%s' "$2"
+  fi
+}
+
+# deny_reason <top> <diff-kind>: the denial text for the pending checks.
+deny_reason() {
+  local top="$1" kind="$2" target stamp_all scope script pending="" actions=""
+  if [ "$kind" = HEAD ]; then
+    target=" worktree"; stamp_all=" --all"; scope="git commit -a: staged and unstaged changes"
+  else
+    target=""; stamp_all=""; scope="staged changes"
+  fi
+  script="$SCRIPT_PATH"
+  [ -f "$top/.agents/hooks/commit-gate.sh" ] && script="$top/.agents/hooks/commit-gate.sh"
+  script="$(printf '%q' "$script")"
+  top="$(printf '%q' "$top")"
+
+  [ "$review_pending" = yes ] && pending="${pending}code review (unreviewed changes); "
+  [ "$docs_pending" = yes ] && pending="${pending}documentation (code changes with no documentation updates); "
+  pending="${pending%; }"
+
+  [ "$review_pending" = yes ] && actions="${actions}run $(skill_ref "$1" code-review)${target}, then stamp: bash $script --stamp-review${stamp_all} $top. "
+  [ "$docs_pending" = yes ] && actions="${actions}run $(skill_ref "$1" doc-sync)${target}, then stamp: bash $script --stamp-docs${stamp_all} $top. "
+
+  printf '%s' "Pending before commit ($scope): $pending. Ask the user: 'Run code review / documentation check before committing?' If agreed: $actions For waived checks, rerun the commit with --no-verify."
+}
+
+# --- git hook mode ----------------------------------------------------------
+if [ "${1:-}" = --pre-commit ]; then
+  top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+  git_dir="$(git -C "$top" rev-parse --absolute-git-dir 2>/dev/null)" || exit 0
+  pending_checks "$top" "$git_dir" --cached || exit 0
+  [ "$review_pending" = yes ] || [ "$docs_pending" = yes ] || exit 0
+  # The hook can't see `-a`: git commits from its own index file then. Name
+  # the staged stamp when the user's index (what --stamp-review hashes) holds
+  # this diff, the --all stamp otherwise; it matches under `commit -a`.
+  kind=--cached
+  if [ "$(git -C "$top" diff --cached 2>/dev/null | hash_of)" != \
+       "$(GIT_INDEX_FILE="$git_dir/index" git -C "$top" diff --cached 2>/dev/null | hash_of)" ]; then
+    kind=HEAD
+  fi
+  echo "commit-gate: $(deny_reason "$top" "$kind")" >&2
+  exit 1
+fi
+
+# --- plugin mode ------------------------------------------------------------
 input="$(cat 2>/dev/null)" || exit 0
 [ -n "$input" ] || exit 0
 # The hook runs on every Bash call. A command that runs `git commit` contains
@@ -115,63 +213,11 @@ EOF
 
 top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" || exit 0
 git_dir="$(git -C "$top" rev-parse --absolute-git-dir 2>/dev/null)" || exit 0
-load_docs "$top"
-
-# Empty diff (allow-empty commits, merge continuations, nothing staged): allow.
-# Any git error (e.g. `commit -a` before the first commit): fail open.
-git -C "$top" diff "$diff_kind" --quiet 2>/dev/null
-[ $? -eq 1 ] || exit 0
-
-{ IFS= read -r full_hash; IFS= read -r code_hash || code_hash=""; } <<EOF
-$(diff_hashes "$top" "$diff_kind")
-EOF
-[ "${#full_hash}" -ge 8 ] || exit 0  # hash failed -> fail open
-
-docs_touched=no
-if [ -n "$(git -C "$top" diff "$diff_kind" --name-only -- "${DOCS[@]}" 2>/dev/null)" ]; then
-  docs_touched=yes
-fi
-
-stamped() { [ -f "$git_dir/$1" ] && grep -qxF -e "$2" "$git_dir/$1" 2>/dev/null; }
-
-# --- review check -----------------------------------------------------------
-review_pending=yes
-if stamped review-stamp "$full_hash" || { [ -n "$code_hash" ] && stamped review-stamp "$code_hash"; }; then
-  review_pending=no
-fi
-
-# --- docs check -------------------------------------------------------------
-docs_pending=no
-if [ -n "$code_hash" ] && [ "$docs_touched" = no ]; then
-  if git -C "$top" ls-files -- "${DOCS[@]}" 2>/dev/null | grep -q .; then
-    docs_pending=yes
-    stamped doc-stamp "$code_hash" && docs_pending=no
-  fi
-fi
-
+pending_checks "$top" "$git_dir" "$diff_kind" || exit 0
 [ "$review_pending" = yes ] || [ "$docs_pending" = yes ] || exit 0
 
-# --- combined denial --------------------------------------------------------
-if [ "$diff_kind" = HEAD ]; then
-  target=" worktree"; stamp_all=" --all"; scope="git commit -a: staged and unstaged changes"
-else
-  target=""; stamp_all=""; scope="staged changes"
-fi
-script_q="$(printf '%q' "$SCRIPT_PATH")"
-top_q="$(printf '%q' "$top")"
-
-pending=""
-[ "$review_pending" = yes ] && pending="${pending}code review (unreviewed changes); "
-[ "$docs_pending" = yes ] && pending="${pending}documentation (code changes with no documentation updates); "
-pending="${pending%; }"
-
-actions=""
-[ "$review_pending" = yes ] && actions="${actions}run /agentic-toolkit:code-review${target}, then stamp: bash $script_q --stamp-review${stamp_all} $top_q. "
-[ "$docs_pending" = yes ] && actions="${actions}run /agentic-toolkit:doc-sync${target}, then stamp: bash $script_q --stamp-docs${stamp_all} $top_q. "
-
-reason="Pending before commit ($scope): $pending. Ask the user: 'Run code review / documentation check before committing?' If agreed: $actions For waived checks, rerun the commit with --no-verify."
 python3 -c '
 import json, sys
 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
-    "permissionDecision": "deny", "permissionDecisionReason": sys.argv[1]}}))' "$reason" 2>/dev/null
+    "permissionDecision": "deny", "permissionDecisionReason": sys.argv[1]}}))' "$(deny_reason "$top" "$diff_kind")" 2>/dev/null
 exit 0

@@ -34,7 +34,7 @@ The documentation standards (audience, surgical edits, diagrams, ADR correlation
 4. **Apply** the accepted proposals, and write any new docs, to the rubric's standards. If the project has no docs yet, start `docs/` with a short index that links the README.
 5. **Check ADRs.** The change implements or contradicts an Accepted ADR → surface it; a genuine direction change goes through the adr-planning skill first, then the docs. A new architectural decision appeared while writing docs → stop, run the adr-planning skill, then continue.
 6. **Report** per doc: updated / created / deleted / unchanged (and why), then offer to commit. doc-sync's output is applied documentation, not just findings.
-7. **Unblock the commit.** If the commit gate denied with "documentation" pending, stamp with the command from its denial message (`commit-gate.sh --stamp-docs`). Only the user can waive the check: if they declined, commit with `--no-verify`. Never stamp a code diff whose docs were not actually checked.
+7. **Unblock the commit.** If the commit gate denied with "documentation" pending (a Claude Code hook denial, or a `git commit` that failed with `commit-gate:` on stderr), stamp with the command from that message (`commit-gate.sh --stamp-docs`). Only the user can waive the check: if they declined, commit with `--no-verify`. Never stamp a code diff whose docs were not actually checked.
 
 ## Gotchas
 

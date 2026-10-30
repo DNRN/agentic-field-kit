@@ -4,7 +4,7 @@ Date: 2026-10-22
 
 ## Status
 
-Accepted. Decision item 2's subagent input contract and item 3 (the command layer) superseded by [0005](0005-rubrics-live-in-skills.md).
+Accepted. Decision item 2's subagent input contract and item 3 (the command layer) superseded by [0005](0005-rubrics-live-in-skills.md). The first consequence (a deterministic gate in Claude Code only) superseded by [0013](0013-commit-gate-as-git-hook.md).
 
 ## Context
 
