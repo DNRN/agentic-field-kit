@@ -226,7 +226,7 @@ Components have no version numbers of their own (ADR 0008).
 
 **Problem.** The gate's denial message names `/agentic-toolkit:code-review` and `/agentic-toolkit:doc-sync`. Those are the plugin's names. A project install exposes them as bare `code-review` and `doc-sync`. Wiring the hook into a project also means merging JSON into `.claude/settings.json`.
 
-**Change.** Defer this until roadmap phase 1 (portable commit gate as a git `pre-commit` hook). That item already plans an installer for every harness. When it lands, `catalog.tsv` gets a `hook` row whose install runs that installer, and the gate takes the skill names as a parameter. Until then, the catalog row's `harnesses` is `plugin` and `--list` says so.
+**Change.** Defer this until [roadmap phase 1](roadmap.md#phase-1-enforce-existing-themes): the portable commit gate as a git `pre-commit` hook, a `hook` kind in the `agentic-toolkit` installer, and a gate message that names the skills as installed. When it lands, the `commit-gate` row's `harnesses` becomes `all`. Until then, the catalog row's `harnesses` is `plugin` and `--list` says so.
 
 **Acceptance.** Before roadmap phase 1, `commit-gate` can't be selected outside the plugin, and the menu says why.
 
