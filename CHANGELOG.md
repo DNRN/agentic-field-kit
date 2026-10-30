@@ -6,6 +6,9 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ### Added
 
+- `ship` skill: on an explicit "ship it", one flow from finished change to commit: code review, documentation check, commit message, commit, leaving the stamps the commit gate looks for. It stops to ask when the review blocks or a doc change needs a decision.
+- `adr-index` SessionStart hook (plugin): lists the project's Accepted ADRs, one line each, at the start of every Claude Code session.
+- `adr-planning` records a decision as an ADR on request, and supersedes an Accepted ADR: a new ADR, and only the old one's Status changes, as the commit gate's ADR check requires. A verdict given in the request ("record it as Accepted") counts.
 - The git hook mode of the commit gate denies commits that change an Accepted ADR (`docs/adr/NNNN-*.md`) outside its `## Status` section, or delete or rename one ([ADR 0015](docs/adr/0015-accepted-adrs-guarded-at-commit.md)). Status edits such as `Superseded by NNNN` pass; the waiver is `--no-verify`.
 - `agentic-toolkit commit-gate` installs the commit gate into a project as a git hook, the installer's new `hook` kind ([ADR 0014](docs/adr/0014-git-hook-layout.md)). The gate is copied to `.agents/hooks/commit-gate.sh` and recorded in the manifest; a marked `pre-commit` shim in the clone runs it (honouring `core.hooksPath`). `--list` shows `inactive` in a clone without the shim, and `--update` writes it. An existing `pre-commit` hook is never changed: the installer prints a fail-open line to add. `--remove` deletes the copy and its own shim only. Global installs are refused: git hooks are per repository.
 - `commit-gate.sh --pre-commit`: the commit gate as a git `pre-commit` hook, so review and docs checks ask before commits from every harness and from a terminal ([ADR 0013](docs/adr/0013-commit-gate-as-git-hook.md)). Same stamps, same docs paths, same `--no-verify` waiver as the Claude Code hook; the denial goes to stderr. Plan: [roadmap phase 1](docs/plans/phase1-enforce-themes.md), with ADRs [0014](docs/adr/0014-git-hook-layout.md) (how the installer will enable it) and [0015](docs/adr/0015-accepted-adrs-guarded-at-commit.md) (Accepted ADRs guarded at commit).
@@ -13,6 +16,7 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ### Changed
 
+- At 80×24 the terminal UI keeps the Entropy Fox and shows 7 component rows; the rest scroll into view with the cursor (the catalog now has 9).
 - With the plugin and the git hook both installed, the plugin's gate steps aside and the git hook asks, so an unreviewed commit asks once ([ADR 0014](docs/adr/0014-git-hook-layout.md)).
 - The commit gate's message names the skills and stamp command as installed: the project's `code-review` and `doc-sync` copies and `.agents/hooks/commit-gate.sh` when present, the plugin's names otherwise.
 - The installer draws the Entropy Fox as coloured ASCII, so every terminal shows it, including terminals without truecolor or image support, tmux, and `NO_COLOR` (uncoloured) ([ADR 0012](docs/adr/0012-logo-drawn-as-text.md)). It replaces the image and half-blocks, which showed only in truecolor terminals; the name's orange is now a 256-colour index too. At 80 columns, header lines longer than the 37 columns beside the logo wrap.

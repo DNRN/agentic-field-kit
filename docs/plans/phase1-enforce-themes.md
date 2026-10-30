@@ -19,9 +19,9 @@ Unchanged: [ADR 0004](../adr/0004-configurable-docs-paths.md) (`.commit-gate-doc
 | P2 | One gate at a time (plugin defers to the git hook) (done 2026-10-30) | P1 | 0014 | 2 |
 | P3 | `hook` kind in the installer (done 2026-10-30; Windows CI pending) | P1 | 0014 | 3 |
 | P4 | `adr-guard` (done 2026-10-30) | P1 | 0015 | 4 |
-| P5 | `adr-index` SessionStart hook | — | — | 5 |
-| P6 | `ship` skill | P1 | — | 6 |
-| P7 | `adr-planning`: create and supersede on demand | — | — | 6 |
+| P5 | `adr-index` SessionStart hook (done 2026-10-30) | — | — | 5 |
+| P6 | `ship` skill (done 2026-10-30) | P1 | — | 6 |
+| P7 | `adr-planning`: create and supersede on demand (done 2026-10-30) | — | — | 6 |
 | P8 | Docs, CHANGELOG, release 0.3.0 | P1–P7 | — | 7 |
 
 P5 and P7 depend on nothing and can go in parallel with P1–P4.
@@ -110,17 +110,25 @@ Tests: 25 checks in `tests/commit-gate.test.sh` ("adr-guard"), which also cover 
 
 **Tests** (`tests/adr-index.test.sh`): fixture with Accepted, Proposed, Rejected, and Superseded ADRs prints only the Accepted ones in order; no `docs/adr/` prints nothing; a malformed file is skipped. Output stays under 80 lines for 60 ADRs (one line each).
 
+**Done** (2026-10-30). Line format `NNNN <title> - <path>` (ASCII hyphen, title without its `NNNN.` prefix), under a heading that says to read an ADR before changing what it decides and to supersede rather than edit. Accepted is read as P4 reads it (the same awk rule, copied, since hooks stay self-contained), so partly superseded ADRs are listed. Bash, `tr`, and awk. Tests also cover CRLF, a `**Status:**` file and an untitled file (both skipped), `docs/adr/README.md`, and the git-root fallback. Not checked in a real session: Claude Code documents a `SessionStart` hook's stdout as added to the context.
+
+The catalog now has 9 components. At 80×24 the terminal UI keeps the fox, as ADR 0012 says, and shows 7 component rows; the rest scroll into view with the cursor (decided 2026-10-30). The R4 test that expected every row at 80×24 became two: 7 rows plus scrolling at 80×24, and every row with the fox on a taller screen.
+
 ## P6. `ship`
 
 **Change.** `skills/ship/SKILL.md`, `disable-model-invocation`-style explicit trigger ("use only when the user asks to ship, or runs /ship"). Procedure: scope the diff (staged, or `--all`); run `code-review`, apply or record the user's call on findings, stamp; run `doc-sync`, stamp; draft the commit message (references the ADR when the change implements one); show it and commit only after the user confirms. Uses the stamp command the gate prints (P1), so it never hard-codes the plugin path. Catalog row, `requires` `code-review,doc-sync`.
 
 **Evals** (`evals/ship/`): golden — a small staged change; the agent reviews, stamps, syncs docs, commits, and the gate does not fire. Negative — "commit this" without asking to ship does not trigger the skill. Negative — reviewer finds a seeded bug; the agent stops and asks instead of committing.
 
+**Done** (2026-10-30), with one change: asking to ship is the go-ahead to commit, so `ship` doesn't ask the user to confirm the message. It stops only when the review blocks, a doc change needs a decision, the scope is unclear, or the gate denies something it can't stamp. Confirming every message would make "ship it" two requests, and the golden eval could never commit. Stamps: it commits, and when the gate denies, runs the stamp commands the denial names for the checks it completed, so it never hard-codes the plugin or project path. Explicit invocation: the description says "use only when the user explicitly asks", plus `metadata` `opencode/slash` and `opencode/autoinvoke` (Claude Code's `disable-model-invocation` is a top-level field, which the portability rules don't allow). Catalog row `skill ship … all code-review,doc-sync`. Eval cases `golden`, `seeded-bug`, `plain-commit`: their scaffolds run; the cases have not been run with `claude plugin eval` yet.
+
 ## P7. `adr-planning`: create and supersede
 
 **Change.** Two sections in `skills/adr-planning/SKILL.md`: "Record a decision on demand" (user asks for an ADR outside a planning flow: same numbering and format, still `Proposed` until the user accepts) and "Supersede an Accepted ADR" (new ADR stating what it replaces; old ADR's Status only becomes `Superseded by NNNN`, or `Accepted. <part> superseded by NNNN` for a partial one, which is what ADR 0015 lets through). Update the description so it triggers on "write an ADR" and "supersede ADR NNNN".
 
 **Evals** (`evals/adr-planning/`): `on-demand` — "record that we use Postgres" creates the next-numbered Proposed ADR; `supersede` — reversing an Accepted decision produces a new ADR and touches only the old one's Status, and the commit passes the P4 check. The existing `contradiction` case keeps passing.
+
+**Done** (2026-10-30). Also: a verdict given in the request ("record it as Accepted, the team agreed") counts, so `supersede` can finish in one turn; otherwise on-demand records start Proposed, and never invent why an alternative lost. The old wording said the new ADR is "marked `Superseded by`"; now the new one says `Supersedes` and the old one gets `Superseded by`. The `supersede` eval checks that 0002 is unchanged outside Status and reads `Superseded by 0003`; `on-demand` checks number, sections, Proposed, and the brief. Neither case has been run with `claude plugin eval` yet.
 
 ## P8. Docs and release
 

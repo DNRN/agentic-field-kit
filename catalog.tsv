@@ -3,6 +3,8 @@ skill	adr-planning	skills/adr-planning	all	-	Record design decisions as ADRs
 skill	code-review	skills/code-review	all	-	Fresh-eyes review before commit
 skill	doc-sync	skills/doc-sync	all	-	Keep docs true to the code
 skill	project-init	skills/project-init	all	-	Start a project: git, AGENTS.md, PROJECT.md
+skill	ship	skills/ship	all	code-review,doc-sync	Review, sync docs, and commit
 agent	code-reviewer	agents/code-reviewer.md	claude	code-review	Read-only code review subagent
 agent	doc-auditor	agents/doc-auditor.md	claude	doc-sync	Read-only doc audit subagent
 hook	commit-gate	hooks/scripts/commit-gate.sh	all	code-review,doc-sync	Ask before unreviewed commits
+hook	adr-index	hooks/scripts/adr-index.sh	plugin	-	List Accepted ADRs at session start
