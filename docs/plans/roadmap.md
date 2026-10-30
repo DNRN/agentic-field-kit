@@ -28,6 +28,8 @@ Phase 1 comes first because it turns rules the model must remember into determin
 | `ship` | skill (explicit invocation) | Code review → doc sync → commit message → commit, in one explicit flow; reuses existing skills and stamps as it goes, so the gate passes. A skill, not a command, so it works in every harness ([ADR 0005](../adr/0005-rubrics-live-in-skills.md)) | — |
 | `adr` (create, supersede) | extend `adr-planning` | `adr-planning` already records accept and reject verdicts. Add creating an ADR on demand and superseding one with both records updated, instead of a second ADR skill | — |
 
+**Plan.** [Phase 1 plan](phase1-enforce-themes.md). The decisions below are recorded as ADRs [0013](../adr/0013-commit-gate-as-git-hook.md), [0014](../adr/0014-git-hook-layout.md), and [0015](../adr/0015-accepted-adrs-guarded-at-commit.md), all Accepted (2026-10-30).
+
 **Decisions before implementation** (through [adr-planning](../../skills/adr-planning/SKILL.md); the next free number is 0013):
 
 - Where the installed hook lives. `.git/hooks/pre-commit` is per clone and not committed, so every clone runs `agentic-toolkit --update`. A committed `.agents/hooks/pre-commit` with `core.hooksPath` is shared but still needs per-clone config and replaces the repository's other hooks.

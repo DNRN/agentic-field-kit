@@ -32,7 +32,7 @@ How to review, what counts as a finding, severities, and the report format all l
    Never pass your reasoning about the change. Without subagents: apply the rubric yourself, re-reading every hunk from the diff and checking it against (not through) your intent.
 3. **Report** the reviewer's findings table and verdict verbatim. After **approve**, offer to commit.
 4. **Resolve** after **fix then commit**: fix blockers and majors, then re-review the hunks the fixes touched. The author applies fixes; the reviewer stays read-only.
-5. **Unblock the commit.** If the commit-gate hook denied the commit, stamp the reviewed diff by running the stamp command named in the hook's denial message (`commit-gate.sh --stamp-review`). Only the user can waive review: if they declined, commit with `--no-verify` instead. Never stamp a diff that was not reviewed.
+5. **Unblock the commit.** If the commit gate denied the commit (a Claude Code hook denial, or a `git commit` that failed with `commit-gate:` on stderr), stamp the reviewed diff by running the stamp command named in that message (`commit-gate.sh --stamp-review`). Only the user can waive review: if they declined, commit with `--no-verify` instead. Never stamp a diff that was not reviewed.
 
 ## Gotchas
 

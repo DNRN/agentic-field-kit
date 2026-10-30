@@ -181,5 +181,81 @@ stage docs/a/deep.md
 expect allow "long-form pathspec magic is excluded from the code-only hash" "git commit -m x"
 expect_no_reason "documentation (" "long-form pathspec magic counts as docs" "git commit -m x"
 
+echo "# message names skills and stamp as installed"
+new_repo; stage code.py
+expect_reason "/agentic-toolkit:code-review" "plugin name without a project install" "git commit -m x"
+mkdir -p "$REPO/.agents/skills/code-review" "$REPO/.agents/skills/doc-sync" "$REPO/.agents/hooks"
+cp "$GATE" "$REPO/.agents/hooks/commit-gate.sh"
+expect_reason "run the code-review skill" "bare skill name with a project install" "git commit -m x"
+expect_reason "run the doc-sync skill" "bare doc-sync name with a project install" "git commit -m x"
+expect_reason "$REPO/.agents/hooks/commit-gate.sh --stamp-review" "stamp command uses the installed copy" "git commit -m x"
+expect_no_reason "/agentic-toolkit:" "no plugin names with a project install" "git commit -m x"
+
+echo "# --pre-commit (git hook mode)"
+# hook_repo: a fresh repo whose pre-commit hook runs the gate, as the shim does.
+hook_repo() {
+  new_repo
+  printf '#!/bin/sh\nexec bash "%s" --pre-commit\n' "$GATE" > "$REPO/.git/hooks/pre-commit"
+  chmod +x "$REPO/.git/hooks/pre-commit"
+}
+commit() { # [git commit args...] -> commit's stderr; exit status is commit's
+  (cd "$REPO" && env -i PATH=/usr/bin:/bin HOME="$WORK" git commit -q "$@" 2>&1 >/dev/null)
+}
+expect_commit() { # $1=ok|denied $2=description, rest: git commit args
+  local want="$1" desc="$2" out got; shift 2
+  if out="$(commit "$@")"; then got=ok; else got=denied; fi
+  if [ "$got" = "$want" ]; then echo "ok   $desc"; else echo "FAIL $desc: expected $want, got $got: $out"; fails=$((fails + 1)); fi
+  LAST="$out"
+}
+expect_last() { # $1=substring $2=description
+  case "$LAST" in *"$1"*) echo "ok   $2" ;; *) echo "FAIL $2: stderr lacks '$1': $LAST"; fails=$((fails + 1)) ;; esac
+}
+hook_repo; stage code.py; stage README.md
+expect_commit denied "unreviewed staged change is denied" -m x
+expect_last "code review (unreviewed changes)" "stderr names the pending review"
+expect_last "Ask the user" "stderr tells the agent to ask"
+expect_last "--stamp-review $REPO" "stderr names the stamp command"
+change code.py
+expect_commit denied "partial staging still denied" -m x
+expect_last "--stamp-review $REPO" "partial staging names the staged stamp"
+git -C "$REPO" checkout -q code.py
+stamp --stamp-review "$REPO"
+expect_commit ok "stamped diff is committed" -m x
+stage code.py; stage README.md
+expect_commit ok "--no-verify bypasses" --no-verify -m x
+stage code.py; stage README.md
+expect_commit ok "-n bypasses" -n -m x
+
+hook_repo; change code.py; change README.md
+expect_commit denied "commit -a unreviewed is denied" -a -m x
+expect_last "--stamp-review --all $REPO" "commit -a names the --all stamp"
+stamp --stamp-review --all "$REPO"
+expect_commit ok "--all stamp matches the hook's staged diff under commit -a" -a -m x
+
+hook_repo; stage code.py
+expect_commit denied "code without docs is denied" -m x
+expect_last "documentation (" "stderr names the docs check"
+stamp --stamp-review "$REPO"; stamp --stamp-docs "$REPO"
+expect_commit ok "review and docs stamps clear both checks" -m x
+stage code.py; stage README.md
+stamp --stamp-review "$REPO"
+expect_commit ok "doc edit in the commit satisfies the docs check" -m x
+
+hook_repo
+expect_commit ok "empty commit passes" --allow-empty -m x
+stage code.py; stage README.md
+printf '\377\376garbage\n' > "$REPO/.commit-gate-docs"
+stamp --stamp-review "$REPO"
+expect_commit ok "unusual .commit-gate-docs does not wedge a stamped commit" -m x
+
+hook_repo; stage code.py
+mkdir -p "$REPO/.agents/skills/code-review"
+expect_commit denied "project install message" -m x
+expect_last "run the code-review skill" "hook message names the installed skill"
+out="$(cd "$WORK" && env -i PATH=/usr/bin:/bin bash "$GATE" --pre-commit 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then echo "ok   outside a repository: silent allow"; else echo "FAIL outside a repository: rc=$rc out=$out"; fails=$((fails + 1)); fi
+out="$(cd "$REPO" && git reset -q && env -i PATH=/usr/bin:/bin bash "$GATE" --pre-commit 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then echo "ok   nothing staged: silent allow"; else echo "FAIL nothing staged: rc=$rc out=$out"; fails=$((fails + 1)); fi
+
 [ "$fails" -eq 0 ] && echo "commit-gate: all passed" || echo "commit-gate: $fails failed"
 [ "$fails" -eq 0 ]
