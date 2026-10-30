@@ -1,6 +1,6 @@
 ---
 name: adr-planning
-description: Use when planning or defining a new feature and architectural decisions arise - record each significant decision as an Architecture Decision Record (ADR) before implementation starts, brief the user, and record their verdict. Also use when the user accepts, rejects, or wants to change a Proposed ADR. Skip for bug fixes, chores, and choices with no lasting structural impact.
+description: Use when planning or defining a new feature and architectural decisions arise - record each significant decision as an Architecture Decision Record (ADR) before implementation starts, brief the user, and record their verdict. Also use when the user asks to write, record, or create an ADR for a decision, to supersede, replace, or reverse an Accepted ADR, or accepts, rejects, or wants to change a Proposed ADR. Skip for bug fixes, chores, and choices with no lasting structural impact.
 ---
 
 # ADR planning
@@ -11,6 +11,8 @@ Architecture decisions made during feature planning get captured as [ADRs](https
 
 - The user asks to plan, design, or scope a new feature, service, or migration.
 - During planning, a choice appears that is hard to reverse, crosses module or service boundaries, constrains future work, or carries real tradeoffs: frameworks, data models, protocols, storage engines, sync vs async, monolith vs services.
+- The user asks to record a decision as an ADR outside a planning flow: see [Record a decision on demand](#record-a-decision-on-demand).
+- The user wants to change, replace, or reverse an Accepted decision: see [Supersede an Accepted ADR](#supersede-an-accepted-adr).
 
 Trivial choices - naming, formatting, single-file changes, library upgrades without alternatives - do not get ADRs.
 
@@ -55,9 +57,31 @@ Trivial choices - naming, formatting, single-file changes, library upgrades with
     - *Accept*: set the status to `Accepted`. Change nothing else.
     - *Change*: edit the Proposed ADR, then brief only what changed and ask again.
     - *Reject*: set the status to `Rejected` with the reason in one sentence, keep the file, and revise the plan. A rejected option is a decision too; the record stops it from being proposed again.
+    - A verdict the user already gave in the request ("record it as Accepted, the team agreed") counts: write the ADR, record that verdict, and say so in the brief instead of asking.
     - No answer, or an answer that doesn't address the ADRs: they stay Proposed. If the user says to go ahead right after the brief, take it as accepting the ADRs in that brief and say so in the reply ("Recorded 0004 and 0005 as Accepted"), so a wrong reading can be caught.
 
-    Accepted ADRs are immutable - a change of direction means a new ADR marked `Superseded by NNNN`, and the old one updated to `Superseded by <new NNNN>`.
+    Accepted ADRs are immutable - a change of direction is a new ADR that supersedes the old one: see [Supersede an Accepted ADR](#supersede-an-accepted-adr).
+
+## Record a decision on demand
+
+The user names a decision to record ("write an ADR that we use Postgres"), often one already made in chat or code.
+
+1. Find the ADR home and the next free number (steps 2-4); bootstrap `0001` only when no home exists.
+2. Write one ADR in the project's format (step 5). Take the context and alternatives from what the user said and what the code shows; where neither says why an alternative lost, write that it was not recorded rather than inventing a reason.
+3. Status `Proposed`, even when the decision is already in the code: brief it (step 9) and record the verdict (step 10). A user who asked for the record and says "yes" or "go ahead" after the brief has accepted it; a request that already says to record it as Accepted is the verdict.
+
+## Supersede an Accepted ADR
+
+The user wants to change, replace, or reverse a decision an Accepted ADR records. Never edit the old ADR's Context, Decision, or Consequences.
+
+1. Write a new ADR with the next number, status `Proposed`. Its Context says what changed since the old decision and links it (`Supersedes [NNNN](NNNN-title.md)`, or `Supersedes the <part> of [NNNN](…)` when only part changes). Its rejected alternatives include keeping the old decision, with the reason it lost.
+2. Brief it and record the verdict (steps 9 and 10). Leave the old ADR alone while the new one is Proposed.
+3. On acceptance, change only the old ADR's Status section:
+   - whole decision replaced: `Superseded by [NNNN](NNNN-title.md)`;
+   - part replaced: keep `Accepted` first and add what was replaced, as in `Accepted. The <part> superseded by [NNNN](NNNN-title.md).`
+4. Update the plan or docs that cite the old decision so they point at the new one.
+
+A commit that edits an Accepted ADR anywhere but its Status section is denied where the commit gate runs as a git hook; a supersede done as above passes.
 
 ## Gotchas
 

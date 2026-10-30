@@ -35,3 +35,8 @@ README.md
 Everything outside these paths is code. The list decides whether a commit touched docs, whether the repo has docs at all (no match means the docs check is off), and which edits leave a review stamp valid. Changing the list invalidates existing docs stamps.
 
 **Accepted ADRs are immutable** ([ADR 0015](../docs/adr/0015-accepted-adrs-guarded-at-commit.md)). The git hook mode also denies a commit that changes `docs/adr/NNNN-*.md` outside its `## Status` section when the `HEAD` version's Status starts with `Accepted`, and one that deletes or renames such an ADR. Status edits (`Superseded by NNNN`, notes, links), new ADRs, and Proposed or Rejected ADRs pass; carriage returns don't count. There is no stamp: the answer is a superseding ADR, or `--no-verify`. One denial lists every failing check. An ADR whose Status isn't a `## Status` heading followed by a line starting `Accepted` isn't recognised, and passes. Only the git hook checks ADRs; the plugin mode doesn't.
+
+## adr-index.sh
+
+`SessionStart` hook: prints the project's Accepted ADRs, one line each (`0014 The gate script is committed; … - docs/adr/0014-git-hook-layout.md`), which Claude Code adds to the session's context. Every session then knows which decisions hold without reading `docs/adr/`. Accepted is read as the commit gate's ADR check reads it ([ADR 0015](../docs/adr/0015-accepted-adrs-guarded-at-commit.md)), so partly superseded ADRs are listed and fully superseded ones aren't. The project is `$CLAUDE_PROJECT_DIR`, else the git root. Silent when there is no `docs/adr/`, no Accepted ADR, or an error. Plugin only (`harnesses` `plugin`); other harnesses rely on `AGENTS.md` pointing at `docs/adr/`, which [`project-init`](../skills/project-init/SKILL.md) writes.
+

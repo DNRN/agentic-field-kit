@@ -46,6 +46,11 @@ evals/<component>/<case>/
 | | `contradiction` | Surfaces the conflict with an Accepted ADR and drafts a superseding one |
 | | `verdict` | Records a rejection and an acceptance in the Status sections; keeps the rejected ADR; follows up on the plan |
 | | `bug-fix` | Fixes a failing test without creating an ADR or loading the skill |
+| | `on-demand` | "Write an ADR that we use Postgres": next number, project's sections, Proposed, briefed with a verdict request, no invented reasons |
+| | `supersede` | Reverses an agreed-on Accepted ADR: new ADR 0003 supersedes 0002; 0002 changes only in its Status (so the commit gate's ADR check passes) |
+| ship | `golden` | "Ship it" on a correct change: review, README gains the new flag, one commit, no `--no-verify` |
+| | `seeded-bug` | Review finds the off-by-one: nothing committed, the user is asked |
+| | `plain-commit` | "Commit with message X" does not load `ship` |
 | project-init | `skip-dialogue` | Empty directory, user stays local and skips the questions: git repository, `AGENTS.md` pointing at `PROJECT.md`, `CLAUDE.md` importing `AGENTS.md`, open questions instead of guesses; no remote |
 | | `brief-given` | Brief given up front: `PROJECT.md` records the stated stack and non-goal and invents no technology |
 | | `existing-claude-md` | Rules in an existing `CLAUDE.md` move to `AGENTS.md`; `CLAUDE.md` imports it |

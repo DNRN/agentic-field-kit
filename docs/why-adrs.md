@@ -20,4 +20,6 @@ When agents draft, humans review. ADRs make the reviewable unit bigger than the 
 **6. One record, every reader.**
 New teammate, new agent, new tool, future you: everyone inherits the same context from the same file. ADRs are onboarding documentation for humans and machines at once.
 
+**Kept honest by the tools, not by memory.** In this toolkit a session starts with the Accepted ADRs listed in its context (the `adr-index` hook), and a commit that rewrites an Accepted ADR instead of superseding it is denied (the commit gate's ADR check, [ADR 0015](adr/0015-accepted-adrs-guarded-at-commit.md)). The skill asks for both; the hooks make them happen.
+
 The pattern underneath: agentic coding moves the bottleneck from writing code to keeping decisions coherent. Tests verify behavior; ADRs verify design. Most agent workflows have the first — the second is the missing half.
