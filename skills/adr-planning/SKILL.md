@@ -20,7 +20,9 @@ Trivial choices - naming, formatting, single-file changes, library upgrades with
 
 1. **Surface the decisions** while planning. Test each candidate: would changing it later require coordinated edits in multiple places? Does it constrain what can be built next? No to both means it is not architectural - leave it as a plan note, not an ADR.
 2. **Find the project's ADR home** before creating anything: look for `docs/adr/`, `doc/architecture/decisions/`, `adr/`, or grep for existing `NNNN-*.md` decision records. If the project already has ADRs, follow its numbering and section format - never impose a second convention.
-3. **If none exists**, create `docs/adr/` and start with `0001-record-architecture-decisions.md` (the bootstrap record), using the template below.
+3. **If none exists**, create `docs/adr/` and start with `0001-record-architecture-decisions.md` (the bootstrap record), using the template below. Then tell every future session where decisions live: add this line to `AGENTS.md`, or to `CLAUDE.md` when there is no `AGENTS.md` (create neither):
+
+   > Architecture decisions are recorded in [docs/adr/](docs/adr/). Accepted ones hold: read the one that applies before changing what it decides, and change a decision by superseding it with a new ADR, never by editing it.
 4. **One ADR per decision.** Number sequentially with zero-padded 4 digits (`0002-kebab-title.md`); never renumber or reuse numbers.
 5. **Write it** with these sections:
 

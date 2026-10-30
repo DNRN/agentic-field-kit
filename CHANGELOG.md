@@ -17,6 +17,8 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ### Changed
 
+- `project-init`'s initial commit also stages what the installer put in the folder: `.agents/agentic-toolkit.tsv` and the paths it records. It still never stages everything (`git add -A`) or all of `.claude/`. Starting a project from the installer's new project screen no longer leaves the installed copies untracked.
+- `adr-planning` adds a line to `AGENTS.md` (or `CLAUDE.md` when there is none) when it creates `docs/adr/`, telling every session where decisions live and that Accepted ones are superseded, not edited. `project-init` writes the same line when the project already has ADRs. Harnesses without the `adr-index` hook learn about the ADRs this way.
 - Outside a git repository the installer explains how to start a project: the error and the menu point at `agentic-toolkit --project . project-init`, `project-init`'s details say it runs in your agent, and installing it ends with "Next: open your agent … and ask it to start the project". It no longer suggests a `git add` in a folder without git. The README has a "Start a new project" section.
 - At 80×24 the terminal UI keeps the Entropy Fox and shows 7 component rows; the rest scroll into view with the cursor (the catalog now has 9).
 - With the plugin and the git hook both installed, the plugin's gate steps aside and the git hook asks, so an unreviewed commit asks once ([ADR 0014](docs/adr/0014-git-hook-layout.md)).

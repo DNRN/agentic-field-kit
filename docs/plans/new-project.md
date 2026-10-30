@@ -16,7 +16,7 @@ Unchanged: [ADR 0006](../adr/0006-project-scope-install-default.md) for every ru
 | N0 | This plan; ADRs 0016–0017 accepted (done 2026-10-30) | — | 0016, 0017 |
 | N1 | Hints: CLI error, menu line, `project-init` details, "Next:" after install, README section (done 2026-10-30) | — | — |
 | N2 | New project screen (done 2026-10-30) | N0, N1 | 0016 |
-| N3 | Hand-off to the agent (done 2026-10-30; macOS and Windows manual runs pending) | N2 | 0017 |
+| N3 | Hand-off to the agent (done 2026-10-30; checked with Claude Code and omp on Linux; macOS and Windows pending) | N2 | 0017 |
 | N4 | Check and add Codex, Gemini CLI, OpenCode, Cursor to the agent table | N3 | 0017 |
 
 ## N2. New project screen
@@ -47,7 +47,8 @@ Unchanged: [ADR 0006](../adr/0006-project-scope-install-default.md) for every ru
 - Keys on the new project screen: `↑↓` and Enter, or `h` here, `s` new folder (then type the name; Enter creates, Esc goes back), `b` browse, `q` quit. One agent on PATH starts without a question; several get a numbered list; none, or `q` on the list, ends with the printed next step.
 - Project files that set the "here" default: `package.json`, `Cargo.toml`, `pyproject.toml`, `setup.py`, `requirements.txt`, `go.mod`, `pom.xml`, `build.gradle(.kts)`, `Gemfile`, `composer.json`, `mix.exs`, `CMakeLists.txt`, `Makefile`.
 - Tests: 6 `newproject` and 3 `agents` unit tests (including a started script that sees the folder and the prompt as one argument), 8 TUI tests (path shown at 80×24, home without "here", browse, here without an agent, a created subfolder with one agent, a refused name, picking among two, dry run).
-- Checked by hand on Linux in a pseudo-terminal: the release binary in an empty `~/code/shop` drew the screen at 80×24; `h` installed `project-init`, printed "Starting Claude Code in ~/code/shop…", and replaced itself with a `claude` stand-in on `PATH`, which ran in that folder with the prompt as its only argument. Not yet run: a real Claude Code or omp session, macOS, Windows.
+- Checked by hand on Linux in a pseudo-terminal: the release binary in an empty `~/code/shop` drew the screen at 80×24; `h` installed `project-init`, printed "Starting Claude Code in ~/code/shop…", and replaced itself with a `claude` stand-in on `PATH`, which ran in that folder with the prompt as its only argument. Not yet run: macOS, Windows.
+- Checked with real agents (2026-10-30, Linux, by the user): from an empty folder, both Claude Code and omp opened in it and ran `project-init`, which wrote `AGENTS.md`, `CLAUDE.md` (`@AGENTS.md`), and `PROJECT.md` with open questions. Two gaps it showed, fixed after: `project-init` staged only its own files, so the installed copies and the manifest would stay untracked after its initial commit; and `AGENTS.md` didn't point at `docs/adr/`, though the roadmap and `hooks/README.md` said `project-init` writes that line. Now `project-init` also stages what the manifest records, and `adr-planning` adds the line when it creates `docs/adr/` (`project-init` when the folder exists).
 
 ## N4. More agents
 
