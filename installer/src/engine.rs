@@ -364,11 +364,45 @@ pub fn both_scopes_warning(name: &str, global: &str) -> String {
     )
 }
 
-pub fn commit_hint(root: &Path) -> String {
-    format!(
-        "Commit the changes so teammates get the same set: git -C \"{}\" add .agents .claude",
-        root.display()
-    )
+/// The skill that starts a project. It runs in the agent, so installing it is
+/// only the first step.
+pub const PROJECT_INIT: &str = "project-init";
+
+/// How to start a new project from a folder that isn't a git repository yet.
+pub fn new_project_hint() -> Vec<String> {
+    vec![
+        format!(
+            "To start a new project in this folder: agentic-toolkit --project . {PROJECT_INIT}, then open your agent here and ask it to start the project."
+        ),
+        format!(
+            "To have {PROJECT_INIT} in every folder instead: agentic-toolkit --global {PROJECT_INIT}."
+        ),
+    ]
+}
+
+/// What the user does after installing `name`, for a component whose use
+/// isn't automatic.
+pub fn next_step(name: &str, scope: Scope) -> Option<String> {
+    (name == PROJECT_INIT).then(|| {
+        let folder = match scope {
+            Scope::Project => "this project's folder",
+            Scope::Global => "a new project's folder",
+        };
+        format!(
+            "Next: open your agent in {folder} and ask it to start the project; {PROJECT_INIT} sets up git, AGENTS.md, and PROJECT.md."
+        )
+    })
+}
+
+/// None when the project isn't a git repository yet (a `--project` folder
+/// that `project-init` will set up): there is nothing to commit to.
+pub fn commit_hint(root: &Path) -> Option<String> {
+    root.join(".git").exists().then(|| {
+        format!(
+            "Commit the changes so teammates get the same set: git -C \"{}\" add .agents .claude",
+            root.display()
+        )
+    })
 }
 
 /// `names`, or with `all` every component the scope supports, plus what they require.
@@ -1064,6 +1098,21 @@ mod tests {
             !f.project.join(".agents").exists(),
             "manifest and empty folders are removed"
         );
+    }
+
+    #[test]
+    fn only_project_init_has_a_next_step() {
+        assert!(next_step("project-init", Scope::Project).is_some());
+        assert!(next_step("project-init", Scope::Global).is_some());
+        assert!(next_step("code-review", Scope::Project).is_none());
+    }
+
+    #[test]
+    fn no_commit_hint_without_git() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(commit_hint(tmp.path()).is_none());
+        fs::create_dir_all(tmp.path().join(".git")).unwrap();
+        assert!(commit_hint(tmp.path()).is_some());
     }
 
     fn hook_file(f: &Fixture) -> PathBuf {

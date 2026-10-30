@@ -4,7 +4,9 @@
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
+use std::fs;
 use std::io;
+use std::path::{Path, PathBuf};
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Constraint, Flex, Layout};
@@ -15,12 +17,14 @@ use ratatui::widgets::{
 };
 use ratatui::{DefaultTerminal, Frame};
 
+use crate::agents::{self, Agent};
 use crate::brand;
 use crate::engine::{self, Action, Options};
 use crate::githook::{self, State};
 use crate::list;
 use crate::manifest;
-use crate::scope::{Scope, detected_harnesses, plugin_on};
+use crate::newproject::{self, Choice, Folder};
+use crate::scope::{self, Scope, detected_harnesses, plugin_on};
 use crate::status::{Ctx, is_ours};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,8 +66,35 @@ pub struct Review {
     pub scroll: usize,
 }
 
+/// The new project screen (ADR 0016): where the user stands and what to do.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Start {
+    pub folder: Folder,
+    pub highlight: Choice,
+    /// The subfolder name being typed, once "new subfolder" is chosen.
+    pub name: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Which agent to start in the new project (ADR 0017).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pick {
+    pub dir: PathBuf,
+    pub agents: Vec<&'static Agent>,
+    pub cursor: usize,
+}
+
+/// What `run` hands back: lines to print, success, and the agent to start.
+pub struct Outcome {
+    pub log: Vec<String>,
+    pub ok: bool,
+    pub handoff: Option<(&'static Agent, PathBuf)>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
+    NewProject(Start),
+    PickAgent(Pick),
     List,
     Review(Review),
     Result(Vec<String>),
@@ -94,6 +125,10 @@ pub struct App {
     /// and whether its last line has been on screen.
     review_rows: Cell<(usize, usize)>,
     review_seen_end: Cell<bool>,
+    /// The agent to start after the UI closes, and where.
+    pub handoff: Option<(&'static Agent, PathBuf)>,
+    /// Agents the new project flow can start: those on PATH.
+    pub agents: Vec<&'static Agent>,
 }
 
 impl App {
@@ -104,6 +139,10 @@ impl App {
             Scope::Project
         };
         let message = match (&ctx.root, &why) {
+            (None, Some(why)) if !global && why.starts_with(scope::NO_REPO) => format!(
+                "No git repository here: showing the global scope. New project? See {}.",
+                engine::PROJECT_INIT
+            ),
             (None, Some(why)) if !global => format!("{why}. Showing the global scope."),
             _ => String::new(),
         };
@@ -123,6 +162,8 @@ impl App {
             failed: false,
             review_rows: Cell::new((0, 0)),
             review_seen_end: Cell::new(false),
+            handoff: None,
+            agents: agents::available(),
         };
         app.refresh();
         app
@@ -185,14 +226,191 @@ impl App {
             self.on_review_key(key.code);
             return;
         }
+        if matches!(self.screen, Screen::NewProject(_)) {
+            self.on_start_key(key.code);
+            return;
+        }
+        if matches!(self.screen, Screen::PickAgent(_)) {
+            self.on_pick_key(key.code);
+            return;
+        }
         match self.screen {
             Screen::List => self.on_list_key(key.code),
             Screen::Result(_) => match key.code {
                 KeyCode::Char('q') => self.quit = true,
                 _ => self.screen = Screen::List,
             },
-            Screen::Help | Screen::Review(_) => self.screen = Screen::List,
+            Screen::Help | Screen::Review(_) | Screen::NewProject(_) | Screen::PickAgent(_) => {
+                self.screen = Screen::List
+            }
         }
+    }
+
+    /// Opens the new project screen for `dir`, a folder outside any git
+    /// repository (ADR 0016).
+    pub fn start_new_project(&mut self, dir: &Path) {
+        let folder = newproject::inspect(dir, &self.ctx.home);
+        self.screen = Screen::NewProject(Start {
+            highlight: folder.default_choice(),
+            folder,
+            name: None,
+            error: None,
+        });
+    }
+
+    fn on_start_key(&mut self, code: KeyCode) {
+        let Screen::NewProject(start) = &mut self.screen else {
+            return;
+        };
+        if let Some(name) = &mut start.name {
+            match code {
+                KeyCode::Char(c) => name.push(c),
+                KeyCode::Backspace => {
+                    name.pop();
+                }
+                KeyCode::Esc => start.name = None,
+                KeyCode::Enter => match newproject::subfolder(&start.folder.path, name) {
+                    Ok(dir) => return self.begin(dir, true),
+                    Err(e) => return start.error = Some(e),
+                },
+                _ => {}
+            }
+            start.error = None;
+            return;
+        }
+        let choices = start.folder.choices();
+        let i = choices
+            .iter()
+            .position(|c| *c == start.highlight)
+            .unwrap_or(0);
+        let choice = match code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                start.highlight = choices[i.saturating_sub(1)];
+                return;
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                start.highlight = choices[(i + 1).min(choices.len() - 1)];
+                return;
+            }
+            KeyCode::Char('h') if choices.contains(&Choice::Here) => Choice::Here,
+            KeyCode::Char('s') => Choice::Subfolder,
+            KeyCode::Char('b') => Choice::Browse,
+            KeyCode::Char('q') | KeyCode::Esc => Choice::Quit,
+            KeyCode::Enter => start.highlight,
+            _ => return,
+        };
+        match choice {
+            Choice::Here => {
+                let dir = start.folder.path.clone();
+                self.begin(dir, false);
+            }
+            Choice::Subfolder => {
+                start.highlight = Choice::Subfolder;
+                start.name = Some(String::new());
+            }
+            Choice::Browse => self.screen = Screen::List,
+            Choice::Quit => self.quit = true,
+        }
+    }
+
+    /// Installs project-init into `dir` (creating it when `create`), then
+    /// hands off to an agent, asks which one, or says what to do next.
+    fn begin(&mut self, dir: PathBuf, create: bool) {
+        let shown = newproject::display(&dir, &self.ctx.home);
+        if self.dry_run {
+            let what = if create { "create it, " } else { "" };
+            self.screen = Screen::Result(vec![format!(
+                "Dry run: would {what}install {} into {shown}, and start your agent there.",
+                engine::PROJECT_INIT
+            )]);
+            return;
+        }
+        if create && let Err(e) = fs::create_dir(&dir) {
+            if let Screen::NewProject(start) = &mut self.screen {
+                start.error = Some(format!("Can't create {shown}: {e}"));
+            }
+            return;
+        }
+        self.ctx.root = Some(dir.clone());
+        self.scope = Scope::Project;
+        let opts = self.scope_opts();
+        let mut lines = vec![format!("Project: {shown}")];
+        let names = [engine::PROJECT_INIT.to_owned()];
+        let applied = engine::plan_install(&self.ctx, &opts, Scope::Project, &names, false)
+            .and_then(|plan| {
+                lines.extend(engine::show(&self.ctx, &opts, Scope::Project, &plan, true));
+                engine::apply(&self.ctx, &opts, Scope::Project, &plan, true)
+                    .map_err(|e| e.to_string())
+            });
+        match applied {
+            Ok(done) => lines.extend(done.messages),
+            Err(e) => {
+                lines.push(format!("! {e}"));
+                self.failed = true;
+                self.log.extend(lines.clone());
+                self.screen = Screen::Result(lines);
+                return;
+            }
+        }
+        self.refresh();
+        self.log.extend(lines.clone());
+        let found = self.agents.clone();
+        match found.as_slice() {
+            [] => {
+                let next = no_agent_lines(&shown);
+                self.log.extend(next.clone());
+                lines.extend(next);
+                self.screen = Screen::Result(lines);
+            }
+            [one] => {
+                self.handoff = Some((one, dir));
+                self.quit = true;
+            }
+            _ => {
+                self.screen = Screen::PickAgent(Pick {
+                    dir,
+                    agents: found,
+                    cursor: 0,
+                })
+            }
+        }
+    }
+
+    fn on_pick_key(&mut self, code: KeyCode) {
+        let Screen::PickAgent(pick) = &mut self.screen else {
+            return;
+        };
+        let last = pick.agents.len().saturating_sub(1);
+        let chosen = match code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                pick.cursor = pick.cursor.saturating_sub(1);
+                return;
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                pick.cursor = (pick.cursor + 1).min(last);
+                return;
+            }
+            KeyCode::Char(c @ '1'..='9') => {
+                let i = c as usize - '1' as usize;
+                if i > last {
+                    return;
+                }
+                i
+            }
+            KeyCode::Enter => pick.cursor,
+            KeyCode::Char('q') | KeyCode::Esc => {
+                let shown = newproject::display(&pick.dir, &self.ctx.home);
+                let next = vec![format!(
+                    "Next: open your agent in {shown} and ask it to start the project."
+                )];
+                self.log.extend(next.clone());
+                self.screen = Screen::Result(next);
+                return;
+            }
+            _ => return,
+        };
+        self.handoff = Some((pick.agents[chosen], pick.dir.clone()));
+        self.quit = true;
     }
 
     fn on_review_key(&mut self, code: KeyCode) {
@@ -507,6 +725,9 @@ impl App {
                 match engine::apply(&self.ctx, &opts, self.scope, &plan, true) {
                     Ok(done) => {
                         lines.extend(done.messages.iter().cloned());
+                        for name in &done.wrote {
+                            lines.extend(engine::next_step(name, self.scope));
+                        }
                         ok &= !done.skipped;
                         touched_project |= self.scope == Scope::Project
                             && (!done.wrote.is_empty() || done.changed);
@@ -529,7 +750,7 @@ impl App {
             }
         }
         if touched_project && let Some(root) = self.ctx.root.as_deref() {
-            lines.push(engine::commit_hint(root));
+            lines.extend(engine::commit_hint(root));
         }
         lines.push(if ok {
             "done".into()
@@ -644,6 +865,149 @@ fn key_line(keys: &str) -> Line<'static> {
     Line::from(spans)
 }
 
+const START_KEYS: &str = "↑↓ move · enter choose · h here · s subfolder · b browse · q quit";
+const NAME_KEYS: &str = "enter create · esc back";
+const PICK_KEYS: &str = "↑↓ move · enter/1-9 start · q don't start";
+
+/// The brand line both start screens open with.
+fn title_line(app: &App) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(brand::NAME, accent()),
+        Span::styled(" · ", dim()),
+        Span::raw(format!("agentic-toolkit {}", app.ctx.version)),
+    ])
+}
+
+/// The new project screen: the folder first, then the choices (ADR 0016).
+fn draw_start(frame: &mut Frame, app: &App, start: &Start) {
+    let home = &app.ctx.home;
+    let here = newproject::display(&start.folder.path, home);
+    let mut lines = vec![
+        title_line(app),
+        Line::from(""),
+        Line::from(Span::styled("You are in", label())),
+        Line::from(Span::styled(format!("  {here}"), accent())),
+        Line::from(Span::styled(
+            format!("  {}", start.folder.describe()),
+            dim(),
+        )),
+        Line::from(""),
+        Line::from(Span::styled("Start a new project?", title())),
+    ];
+    for choice in start.folder.choices() {
+        let (key, text) = match choice {
+            Choice::Here => ("h", format!("Here, in {here}")),
+            Choice::Subfolder => ("s", format!("In a new folder inside {here}")),
+            Choice::Browse => ("b", "No, browse components (install globally)".to_owned()),
+            Choice::Quit => ("q", "Quit".to_owned()),
+        };
+        let on = choice == start.highlight;
+        let style = if on { selected() } else { Style::default() };
+        lines.push(Line::from(vec![
+            Span::styled(if on { " ▸ " } else { "   " }, accent()),
+            Span::styled(format!("{key}  "), title()),
+            Span::styled(text, style),
+        ]));
+    }
+    if start.folder.home_or_root {
+        lines.push(Line::from(Span::styled(
+            "   This folder can't be a project itself; pick a new folder inside it.",
+            dim(),
+        )));
+    }
+    if let Some(name) = &start.name {
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("Folder name: ", label()),
+            Span::raw(name.clone()),
+            Span::styled("▏", accent()),
+        ]));
+        match newproject::subfolder(&start.folder.path, name) {
+            Ok(path) => lines.push(Line::from(Span::styled(
+                format!("Will create {}", newproject::display(&path, home)),
+                dim(),
+            ))),
+            Err(e) if !name.is_empty() => lines.push(Line::from(Span::styled(e, warning()))),
+            Err(_) => {}
+        }
+    }
+    if let Some(e) = &start.error {
+        lines.push(Line::from(Span::styled(e.clone(), warning())));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        format!(
+            "{} is installed there, then your agent starts and sets up git, AGENTS.md, and PROJECT.md with you.",
+            engine::PROJECT_INIT
+        ),
+        dim(),
+    )));
+    let [body, keys] =
+        Layout::vertical([Constraint::Min(5), Constraint::Length(1)]).areas(frame.area());
+    frame.render_widget(
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .block(boxed("New project")),
+        body,
+    );
+    let keys_text = if start.name.is_some() {
+        NAME_KEYS
+    } else {
+        START_KEYS
+    };
+    frame.render_widget(Paragraph::new(key_line(keys_text)), keys);
+}
+
+/// Which agent to start in the new project (ADR 0017).
+fn draw_pick(frame: &mut Frame, app: &App, pick: &Pick) {
+    let shown = newproject::display(&pick.dir, &app.ctx.home);
+    let mut lines = vec![
+        title_line(app),
+        Line::from(""),
+        Line::from(Span::styled("Project", label())),
+        Line::from(Span::styled(format!("  {shown}"), accent())),
+        Line::from(""),
+        Line::from(Span::styled("Start which agent there?", title())),
+    ];
+    for (i, agent) in pick.agents.iter().enumerate() {
+        let on = i == pick.cursor;
+        lines.push(Line::from(vec![
+            Span::styled(if on { " ▸ " } else { "   " }, accent()),
+            Span::styled(format!("{}  ", i + 1), title()),
+            Span::styled(
+                format!("{} ({})", agent.name, agent.command),
+                if on { selected() } else { Style::default() },
+            ),
+        ]));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        format!("It opens with: \"{}\"", agents::PROMPT),
+        dim(),
+    )));
+    let [body, keys] =
+        Layout::vertical([Constraint::Min(5), Constraint::Length(1)]).areas(frame.area());
+    frame.render_widget(
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .block(boxed("Start your agent")),
+        body,
+    );
+    frame.render_widget(Paragraph::new(key_line(PICK_KEYS)), keys);
+}
+
+/// The next step when no agent can be started for the user.
+fn no_agent_lines(shown: &str) -> Vec<String> {
+    let known: Vec<&str> = agents::AGENTS.iter().map(|a| a.command).collect();
+    vec![
+        format!(
+            "No agent that agentic-toolkit can start was found on PATH ({}).",
+            known.join(", ")
+        ),
+        format!("Next: open your agent in {shown} and ask it to start the project."),
+    ]
+}
+
 fn header(app: &App) -> Vec<Line<'static>> {
     let ctx = &app.ctx;
     let project = match &ctx.root {
@@ -704,6 +1068,21 @@ fn details(app: &App) -> Text<'static> {
             .collect();
         if !needed_by.is_empty() {
             lines.push(Line::from(format!("Needed by {}.", needed_by.join(", "))));
+        }
+        if row.name == engine::PROJECT_INIT {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled("How to use", title())));
+            lines.push(Line::from(
+                "It runs in your agent, not here: open your agent in the new project's folder and ask it to start the project.",
+            ));
+            if ctx.root.is_none() {
+                lines.push(Line::from("This folder isn't a project yet. Quit and run:"));
+                lines.push(Line::from(format!(
+                    "  agentic-toolkit --project . {}",
+                    engine::PROJECT_INIT
+                )));
+                lines.push(Line::from("or mark it here to install it globally."));
+            }
         }
         match c.harnesses.as_str() {
             "claude" => lines.push(Line::from("Claude Code only.")),
@@ -891,6 +1270,11 @@ const HELP: [&str; 9] = [
 
 /// Draws the whole screen, with the Entropy Fox when there is room for it.
 pub fn draw(frame: &mut Frame, app: &App) {
+    match &app.screen {
+        Screen::NewProject(start) => return draw_start(frame, app, start),
+        Screen::PickAgent(pick) => return draw_pick(frame, app, pick),
+        _ => {}
+    }
     let area = frame.area();
     let show_logo = brand::logo_fits(area);
     let header_height = if show_logo { brand::LOGO_HEIGHT } else { 5 };
@@ -944,7 +1328,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     frame.render_widget(Paragraph::new(key_line(KEYS)), keys);
 
     match &app.screen {
-        Screen::List => {}
+        Screen::List | Screen::NewProject(_) | Screen::PickAgent(_) => {}
         Screen::Review(review) => {
             let keys = if app.dry_run {
                 "dry run: any key back"
@@ -972,7 +1356,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
 /// Runs the UI until the user quits; the terminal is restored on every exit,
 /// including a panic. Returns the lines applied, for the scrollback, and
 /// whether everything applied could be done.
-pub fn run(mut app: App) -> io::Result<(Vec<String>, bool)> {
+pub fn run(mut app: App) -> io::Result<Outcome> {
     let mut terminal: DefaultTerminal = ratatui::init();
     let result = (|| -> io::Result<()> {
         while !app.quit {
@@ -984,7 +1368,11 @@ pub fn run(mut app: App) -> io::Result<(Vec<String>, bool)> {
         Ok(())
     })();
     ratatui::restore();
-    result.map(|()| (app.log, !app.failed))
+    result.map(|()| Outcome {
+        log: app.log,
+        ok: !app.failed,
+        handoff: app.handoff,
+    })
 }
 
 #[cfg(test)]
@@ -1201,6 +1589,206 @@ mod tests {
         assert!(f.project.join(".agents/hooks/commit-gate.sh").is_file());
         assert!(f.project.join(".git/hooks/pre-commit").is_file());
         assert_eq!(app.rows[n - 1].project, "installed");
+    }
+
+    /// An app started outside a git repository, as `main` builds it.
+    fn app_without_project(f: &Fixture) -> App {
+        let source = Source::Embedded;
+        let catalog = Catalog::parse(&source.catalog_text().unwrap());
+        let ctx = Ctx {
+            version: source.version(),
+            source,
+            catalog,
+            root: None,
+            home: f.home.clone(),
+        };
+        let opts = Options {
+            force: false,
+            mode_arg: None,
+            mode: Mode::Copy,
+            harnesses: Vec::new(),
+        };
+        let why = format!("{}: run agentic-toolkit from your project", scope::NO_REPO);
+        App::new(ctx, opts, false, false, Some(why))
+    }
+
+    #[test]
+    fn outside_a_repository_it_points_at_project_init() {
+        let f = fixture();
+        let mut app = app_without_project(&f);
+        assert_eq!(app.scope, Scope::Global);
+        assert!(app.message.contains("See project-init"), "{}", app.message);
+        let n = row(&app, "project-init");
+        app.cursor = n - 1;
+        let text = screen(&app, 120, 40);
+        assert!(text.contains("How to use"), "{text}");
+        assert!(
+            text.contains("agentic-toolkit --project . project-init"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn inside_a_project_the_detail_says_project_init_runs_in_the_agent() {
+        let f = fixture();
+        let mut app = app(&f);
+        let n = row(&app, "project-init");
+        app.cursor = n - 1;
+        let text = screen(&app, 120, 40);
+        assert!(text.contains("It runs in your agent"), "{text}");
+        assert!(!text.contains("--project ."), "{text}");
+    }
+
+    #[test]
+    fn installing_project_init_says_what_to_do_next() {
+        let f = fixture();
+        let mut app = app(&f);
+        let n = row(&app, "project-init");
+        press(&mut app, &format!("{n}\ny"));
+        assert!(!app.failed, "{:?}", app.log);
+        assert!(
+            app.log
+                .iter()
+                .any(|l| l.starts_with("Next: open your agent")),
+            "{:?}",
+            app.log
+        );
+    }
+
+    /// A new project screen for `dir` (made under the fixture's home), with
+    /// the given agents instead of those on this machine's PATH.
+    fn new_project_app(f: &Fixture, dir: &std::path::Path, agents: &[&'static Agent]) -> App {
+        fs::create_dir_all(dir).unwrap();
+        let mut app = app_without_project(f);
+        app.agents = agents.to_vec();
+        app.start_new_project(dir);
+        app
+    }
+
+    fn start(app: &App) -> &Start {
+        match &app.screen {
+            Screen::NewProject(s) => s,
+            _ => panic!("not on the new project screen"),
+        }
+    }
+
+    #[test]
+    fn the_new_project_screen_shows_where_you_are_first() {
+        let f = fixture();
+        let dir = f.home.join("code/shop");
+        let app = new_project_app(&f, &dir, &[]);
+        let text = screen(&app, 80, 24);
+        assert!(text.contains("You are in"), "{text}");
+        assert!(text.contains("~/code/shop"), "{text}");
+        assert!(
+            text.contains("Empty folder, not a git repository."),
+            "{text}"
+        );
+        assert_eq!(start(&app).highlight, Choice::Here);
+        assert_eq!(
+            fs::read_dir(&dir).unwrap().count(),
+            0,
+            "nothing written before a choice"
+        );
+    }
+
+    #[test]
+    fn home_offers_only_a_subfolder() {
+        let f = fixture();
+        let home = f.home.clone();
+        let app = new_project_app(&f, &home, &[]);
+        let text = screen(&app, 100, 30);
+        assert!(!text.contains("Here, in"), "{text}");
+        assert!(text.contains("can't be a project itself"), "{text}");
+        assert_eq!(start(&app).highlight, Choice::Subfolder);
+    }
+
+    #[test]
+    fn browse_opens_the_global_menu() {
+        let f = fixture();
+        let mut app = new_project_app(&f, &f.home.join("x"), &[]);
+        press(&mut app, "b");
+        assert!(matches!(app.screen, Screen::List));
+        assert_eq!(app.scope, Scope::Global);
+    }
+
+    #[test]
+    fn here_without_an_agent_installs_project_init_and_says_what_next() {
+        let f = fixture();
+        let dir = f.home.join("code/shop");
+        let mut app = new_project_app(&f, &dir, &[]);
+        press(&mut app, "h");
+        assert!(dir.join(".agents/skills/project-init/SKILL.md").is_file());
+        assert!(
+            !dir.join(".git").exists(),
+            "the installer never runs git init"
+        );
+        assert!(!dir.join("AGENTS.md").exists());
+        assert!(app.handoff.is_none());
+        assert!(
+            app.log
+                .iter()
+                .any(|l| l.contains("Next: open your agent in ~/code/shop")),
+            "{:?}",
+            app.log
+        );
+    }
+
+    #[test]
+    fn a_subfolder_is_created_and_the_one_agent_starts_there() {
+        let f = fixture();
+        let dir = f.home.join("code");
+        fs::create_dir_all(dir.join("old/.git")).unwrap();
+        let mut app = new_project_app(&f, &dir, &[&agents::AGENTS[0]]);
+        assert_eq!(start(&app).highlight, Choice::Subfolder);
+        press(&mut app, "\nnew-shop");
+        let text = screen(&app, 100, 30);
+        assert!(text.contains("Will create ~/code/new-shop"), "{text}");
+        press(&mut app, "\n");
+        let target = dir.join("new-shop");
+        assert!(
+            target
+                .join(".agents/skills/project-init/SKILL.md")
+                .is_file()
+        );
+        assert_eq!(app.handoff, Some((&agents::AGENTS[0], target)));
+        assert!(app.quit);
+    }
+
+    #[test]
+    fn a_bad_subfolder_name_creates_nothing() {
+        let f = fixture();
+        let dir = f.home.join("code");
+        fs::create_dir_all(dir.join("taken")).unwrap();
+        let mut app = new_project_app(&f, &dir, &[]);
+        press(&mut app, "staken\n");
+        assert!(start(&app).error.is_some());
+        assert!(!dir.join("taken/.agents").exists());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn with_several_agents_the_user_picks_one() {
+        let f = fixture();
+        let dir = f.home.join("code/shop");
+        let mut app = new_project_app(&f, &dir, &[&agents::AGENTS[0], &agents::AGENTS[1]]);
+        press(&mut app, "h");
+        let text = screen(&app, 100, 30);
+        assert!(text.contains("Start which agent there?"), "{text}");
+        assert!(text.contains(agents::PROMPT), "{text}");
+        press(&mut app, "2");
+        assert_eq!(app.handoff, Some((&agents::AGENTS[1], dir)));
+    }
+
+    #[test]
+    fn a_dry_run_writes_nothing() {
+        let f = fixture();
+        let dir = f.home.join("code/shop");
+        let mut app = new_project_app(&f, &dir, &[&agents::AGENTS[0]]);
+        app.dry_run = true;
+        press(&mut app, "h");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
+        assert!(app.handoff.is_none());
     }
 
     #[test]

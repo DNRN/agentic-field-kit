@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod agents;
 pub mod brand;
 pub mod catalog;
 pub mod check;
@@ -11,6 +12,7 @@ pub mod githook;
 pub mod hash;
 pub mod list;
 pub mod manifest;
+pub mod newproject;
 pub mod scope;
 pub mod source;
 pub mod status;

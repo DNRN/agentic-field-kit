@@ -6,6 +6,7 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ### Added
 
+- A new project screen: `agentic-toolkit` run outside a git repository shows the folder you are in and offers to start a project there or in a new folder inside it ([ADR 0016](docs/adr/0016-new-project-screen.md)). It installs `project-init` into that folder and starts your agent there with an opening prompt to use it: Claude Code or omp, picked when both are installed; other agents get the step to take yourself ([ADR 0017](docs/adr/0017-hand-off-to-the-agent.md)). `b` keeps the old behaviour, the component menu in the global scope.
 - `ship` skill: on an explicit "ship it", one flow from finished change to commit: code review, documentation check, commit message, commit, leaving the stamps the commit gate looks for. It stops to ask when the review blocks or a doc change needs a decision.
 - `adr-index` SessionStart hook (plugin): lists the project's Accepted ADRs, one line each, at the start of every Claude Code session.
 - `adr-planning` records a decision as an ADR on request, and supersedes an Accepted ADR: a new ADR, and only the old one's Status changes, as the commit gate's ADR check requires. A verdict given in the request ("record it as Accepted") counts.
@@ -16,6 +17,7 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ### Changed
 
+- Outside a git repository the installer explains how to start a project: the error and the menu point at `agentic-toolkit --project . project-init`, `project-init`'s details say it runs in your agent, and installing it ends with "Next: open your agent … and ask it to start the project". It no longer suggests a `git add` in a folder without git. The README has a "Start a new project" section.
 - At 80×24 the terminal UI keeps the Entropy Fox and shows 7 component rows; the rest scroll into view with the cursor (the catalog now has 9).
 - With the plugin and the git hook both installed, the plugin's gate steps aside and the git hook asks, so an unreviewed commit asks once ([ADR 0014](docs/adr/0014-git-hook-layout.md)).
 - The commit gate's message names the skills and stamp command as installed: the project's `code-review` and `doc-sync` copies and `.agents/hooks/commit-gate.sh` when present, the plugin's names otherwise.
