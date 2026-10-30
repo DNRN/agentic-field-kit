@@ -6,6 +6,7 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ### Added
 
+- A new project screen: `agentic-toolkit` run outside a git repository shows the folder you are in and offers to start a project there or in a new folder inside it ([ADR 0016](docs/adr/0016-new-project-screen.md)). It installs `project-init` into that folder and starts your agent there with an opening prompt to use it: Claude Code or omp, picked when both are installed; other agents get the step to take yourself ([ADR 0017](docs/adr/0017-hand-off-to-the-agent.md)). `b` keeps the old behaviour, the component menu in the global scope.
 - `ship` skill: on an explicit "ship it", one flow from finished change to commit: code review, documentation check, commit message, commit, leaving the stamps the commit gate looks for. It stops to ask when the review blocks or a doc change needs a decision.
 - `adr-index` SessionStart hook (plugin): lists the project's Accepted ADRs, one line each, at the start of every Claude Code session.
 - `adr-planning` records a decision as an ADR on request, and supersedes an Accepted ADR: a new ADR, and only the old one's Status changes, as the commit gate's ADR check requires. A verdict given in the request ("record it as Accepted") counts.

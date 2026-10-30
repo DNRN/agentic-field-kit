@@ -70,20 +70,18 @@ Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#e
 
 ### Start a new project
 
-The installer copies components; it doesn't create projects. Starting one is the `project-init` skill's job, and it runs in your agent: it sets up git (and a remote, if you have one), writes `AGENTS.md`, a `CLAUDE.md` that imports it, and `PROJECT.md` from a few questions you can skip.
+Run `agentic-toolkit` in the folder where the project should be. Outside a git repository it opens a new project screen ([ADR 0016](docs/adr/0016-new-project-screen.md)): it shows the folder you are in and what is there, and asks whether to start the project here, in a new folder inside it, or to browse components instead. Your home folder is never made a project; you name a new folder inside it.
 
-1. Put the skill where your agent will find it. An empty folder isn't a git repository yet, so name it as the project:
+Starting a project is the `project-init` skill's job, and it runs in your agent: it sets up git (and a remote, if you have one), writes `AGENTS.md`, a `CLAUDE.md` that imports it, and `PROJECT.md` from a few questions you can skip. So the installer installs `project-init` into the folder you picked, then starts your agent there with "Start a new project in this folder with the project-init skill." ([ADR 0017](docs/adr/0017-hand-off-to-the-agent.md)). It starts Claude Code (`claude`) and omp (`omp`) when they are on your `PATH`, and asks which when both are; for other agents it prints the step to take yourself.
 
-   ```bash
-   mkdir my-project && cd my-project
-   agentic-toolkit --project . project-init
-   ```
+Without the menu, the same in two commands:
 
-   Or once for every folder: `agentic-toolkit --global project-init`. With the Claude Code plugin it is already there as `/agentic-toolkit:project-init`.
-2. Open your agent in the folder and ask it to start the project.
-3. Install the rest from the new repository as usual, such as `agentic-toolkit commit-gate`.
+```bash
+mkdir my-project && cd my-project
+agentic-toolkit --project . project-init     # or once for every folder: --global project-init
+```
 
-Run `agentic-toolkit` in a folder without git, and it says the same: the menu points at `project-init`, its details show the command, and installing it ends with the next step.
+then open your agent in the folder and ask it to start the project. With the Claude Code plugin, the skill is already there as `/agentic-toolkit:project-init`. Afterwards, install the rest from the new repository as usual, such as `agentic-toolkit commit-gate`.
 
 ### Global install
 

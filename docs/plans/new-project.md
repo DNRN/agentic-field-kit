@@ -14,9 +14,9 @@ Unchanged: [ADR 0006](../adr/0006-project-scope-install-default.md) for every ru
 | # | Item | Depends on | ADR |
 | --- | --- | --- | --- |
 | N0 | This plan; ADRs 0016–0017 accepted (done 2026-10-30) | — | 0016, 0017 |
-| N1 | Hints: CLI error, menu line, `project-init` details, "Next:" after install, README section (branch `project-init-hints`, built) | — | — |
-| N2 | New project screen | N0, N1 | 0016 |
-| N3 | Hand-off to the agent | N2 | 0017 |
+| N1 | Hints: CLI error, menu line, `project-init` details, "Next:" after install, README section (done 2026-10-30) | — | — |
+| N2 | New project screen (done 2026-10-30) | N0, N1 | 0016 |
+| N3 | Hand-off to the agent (done 2026-10-30; macOS and Windows manual runs pending) | N2 | 0017 |
 | N4 | Check and add Codex, Gemini CLI, OpenCode, Cursor to the agent table | N3 | 0017 |
 
 ## N2. New project screen
@@ -40,6 +40,14 @@ Unchanged: [ADR 0006](../adr/0006-project-scope-install-default.md) for every ru
 - Launch with `std::process::Command`: the agent's command, the prompt as one argument, `current_dir` the project folder. Restore the terminal first. Unix: `exec`. Windows: spawn, wait, exit with its status. A launch error prints the next step and exits 1.
 
 **Tests.** Unit: argument vector per table entry; the prompt is one argument even with spaces and quotes in the folder name. Integration (`tests/install.test.sh` can't drive the TUI): a test-only entry pointing at a script on `PATH` that records its working directory and arguments, launched through the same function. Manual: Claude Code and omp, from an empty folder and from a subfolder choice, on Linux and macOS; Windows Terminal with Claude Code.
+
+## Done (N2, N3), 2026-10-30
+
+- `installer/src/newproject.rs`: inspect the folder, the choices and the default, subfolder names, `~` display. `installer/src/agents.rs`: the table (`claude`, `omp`, each with its check), the prompt, the command (no shell, one argument, the folder as working directory), `exec` on Unix and spawn-and-wait on Windows. The TUI gains the new project and agent screens; `tui::run` returns an `Outcome` with the agent to start, which `main` launches after the terminal is restored.
+- Keys on the new project screen: `↑↓` and Enter, or `h` here, `s` new folder (then type the name; Enter creates, Esc goes back), `b` browse, `q` quit. One agent on PATH starts without a question; several get a numbered list; none, or `q` on the list, ends with the printed next step.
+- Project files that set the "here" default: `package.json`, `Cargo.toml`, `pyproject.toml`, `setup.py`, `requirements.txt`, `go.mod`, `pom.xml`, `build.gradle(.kts)`, `Gemfile`, `composer.json`, `mix.exs`, `CMakeLists.txt`, `Makefile`.
+- Tests: 6 `newproject` and 3 `agents` unit tests (including a started script that sees the folder and the prompt as one argument), 8 TUI tests (path shown at 80×24, home without "here", browse, here without an agent, a created subfolder with one agent, a refused name, picking among two, dry run).
+- Checked by hand on Linux in a pseudo-terminal: the release binary in an empty `~/code/shop` drew the screen at 80×24; `h` installed `project-init`, printed "Starting Claude Code in ~/code/shop…", and replaced itself with a `claude` stand-in on `PATH`, which ran in that folder with the prompt as its only argument. Not yet run: a real Claude Code or omp session, macOS, Windows.
 
 ## N4. More agents
 

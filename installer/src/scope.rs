@@ -138,7 +138,7 @@ pub fn detected_harnesses(home: &Path) -> Vec<&'static str> {
         .collect()
 }
 
-fn on_path(cli: &str) -> bool {
+pub fn on_path(cli: &str) -> bool {
     let Some(path) = env::var_os("PATH") else {
         return false;
     };

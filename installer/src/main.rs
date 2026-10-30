@@ -9,7 +9,7 @@ use agentic_toolkit::engine::{self, Action, Mode, Options, Plan};
 use agentic_toolkit::scope::{self, Scope, home};
 use agentic_toolkit::source::Source;
 use agentic_toolkit::status::Ctx;
-use agentic_toolkit::{check, list, tui};
+use agentic_toolkit::{agents, check, list, newproject, tui};
 
 /// Install agentic-toolkit components into a project or globally.
 ///
@@ -339,19 +339,43 @@ fn main() -> ExitCode {
             return ExitCode::SUCCESS;
         }
         Command::Menu => {
-            let app = tui::App::new(ctx, opts, args.global, args.dry_run, why);
-            return match tui::run(app) {
-                Ok((log, ok)) => {
-                    for line in log {
-                        println!("{line}");
-                    }
-                    if ok {
-                        ExitCode::SUCCESS
-                    } else {
+            // Outside any git repository, with no scope given: offer to start
+            // a project (ADR 0016).
+            let new_project = !args.global
+                && args.project.is_none()
+                && why
+                    .as_deref()
+                    .is_some_and(|w| w.starts_with(scope::NO_REPO));
+            let home = ctx.home.clone();
+            let mut app = tui::App::new(ctx, opts, args.global, args.dry_run, why);
+            if new_project && let Ok(cwd) = std::env::current_dir() {
+                app.start_new_project(&dunce::canonicalize(&cwd).unwrap_or(cwd));
+            }
+            let out = match tui::run(app) {
+                Ok(out) => out,
+                Err(e) => return die(&e.to_string()),
+            };
+            for line in &out.log {
+                println!("{line}");
+            }
+            if let Some((agent, dir)) = out.handoff {
+                let shown = newproject::display(&dir, &home);
+                println!("Starting {} in {shown}…", agent.name);
+                return match agents::launch(agent, &dir) {
+                    Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
+                    Err(e) => {
+                        eprintln!("agentic-toolkit: can't start {}: {e}", agent.command);
+                        eprintln!(
+                            "Next: open your agent in {shown} and ask it to start the project."
+                        );
                         ExitCode::FAILURE
                     }
-                }
-                Err(e) => die(&e.to_string()),
+                };
+            }
+            return if out.ok {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
             };
         }
         Command::Act(action) => action,
