@@ -41,7 +41,7 @@ evals/<component>/<case>/
 | | `new-flow-diagram` | New doc under `docs/` with exactly one mermaid diagram of submit → poll → fetch, linked from the index |
 | | `no-observable-change` | Internal rename: no doc edits, says why |
 | | `waived-check` | User waives the docs check: commits with `--no-verify`, never stamps docs |
-| adr-planning | `plan-feature` | Bootstraps `docs/adr/`, writes Proposed ADRs, plan references them, briefs each ADR and asks for a verdict |
+| adr-planning | `plan-feature` | Bootstraps `docs/adr/` and adds the decisions line to `AGENTS.md`, writes Proposed ADRs, plan references them, briefs each ADR and asks for a verdict |
 | | `existing-format` | Follows the project's ADR home, numbering, and sections |
 | | `contradiction` | Surfaces the conflict with an Accepted ADR and drafts a superseding one |
 | | `verdict` | Records a rejection and an acceptance in the Status sections; keeps the rejected ADR; follows up on the plan |
@@ -55,6 +55,7 @@ evals/<component>/<case>/
 | | `brief-given` | Brief given up front: `PROJECT.md` records the stated stack and non-goal and invents no technology |
 | | `existing-claude-md` | Rules in an existing `CLAUDE.md` move to `AGENTS.md`; `CLAUDE.md` imports it |
 | | `feature-request` | Feature work in a repository without `AGENTS.md`: adds the flag, creates no `AGENTS.md` or `PROJECT.md`, doesn't load the skill |
+| | `installed-copies` | A folder the installer prepared: the initial commit stages the skill's files, the manifest, and the copy it records; never `git add -A`, all of `.claude/`, or `settings.local.json` |
 
 ## Writing graders
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Small service with no ADRs yet.
+# Small service with no ADRs yet, and an AGENTS.md without a decisions line.
 git init -q -b main
 git config user.name "Eval User"
 git config user.email eval@example.com
@@ -19,6 +19,11 @@ if __name__ == "__main__":
     HTTPServer(("", 8000), Handler).serve_forever()
 EOF
 cat > README.md <<'EOF'
+# notes-service
+
+Small HTTP service for shared notes. Run `python app.py`.
+EOF
+cat > AGENTS.md <<'EOF'
 # notes-service
 
 Small HTTP service for shared notes. Run `python app.py`.

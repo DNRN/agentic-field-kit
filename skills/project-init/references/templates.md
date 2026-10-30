@@ -68,6 +68,8 @@ With the dialogue skipped, `PROJECT.md` is the title, whatever the user already 
 
 <One sentence: what this is.> Read [PROJECT.md](PROJECT.md) before planning or building a feature: purpose, users, scope, constraints, and open decisions live there. Update it when they change.
 
+<Only when the project has an ADR folder:> Architecture decisions are recorded in [docs/adr/](docs/adr/). Accepted ones hold: read the one that applies before changing what it decides, and change a decision by superseding it with a new ADR, never by editing it.
+
 ## Commands
 
 - Build: `<command>`
@@ -78,7 +80,7 @@ With the dialogue skipped, `PROJECT.md` is the title, whatever the user already 
 - <A way of working the user stated, or the repository already follows.>
 ```
 
-*Commands* and *Conventions* appear only with real content; a new, empty project usually has neither yet. Keep the file under about 40 lines: it loads into every session.
+The decisions line appears only when the project already has ADRs (`docs/adr/`, or its own folder: use that path); the `adr-planning` skill adds it when it creates the folder. *Commands* and *Conventions* appear only with real content; a new, empty project usually has neither yet. Keep the file under about 40 lines: it loads into every session.
 
 ## CLAUDE.md
 

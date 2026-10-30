@@ -33,15 +33,15 @@ Ask with the harness's question tool if it has one, otherwise in plain text. One
 5. **Run the dialogue** for `PROJECT.md` as described in [`references/dialogue.md`](references/dialogue.md). Open by offering it or skipping it; the user can also stop at any question. Skipped → step 6 with what is known.
 6. **Write the files** from [`references/templates.md`](references/templates.md):
    - `PROJECT.md` from the dialogue. Every topic not answered goes to *Open questions*, never filled with a guess.
-   - `AGENTS.md`: a one-line purpose, the pointer to `PROJECT.md`, and only the commands and conventions the user stated or the repository shows.
+   - `AGENTS.md`: a one-line purpose, the pointer to `PROJECT.md`, the decisions line when the project has an ADR folder, and only the commands and conventions the user stated or the repository shows.
    - `CLAUDE.md`: the line `@AGENTS.md`. Claude Code reads `CLAUDE.md`, not `AGENTS.md`; the import loads it. An import rather than a symlink: a symlink checks out as a plain text file on Windows without `core.symlinks`, and the import leaves room for Claude-only lines below it.
 
    Existing files are updated, never replaced:
-   - `AGENTS.md` exists → add the `PROJECT.md` pointer if it is missing; change nothing else.
+   - `AGENTS.md` exists → add the `PROJECT.md` pointer, and the decisions line when there is an ADR folder, if missing; change nothing else.
    - `CLAUDE.md` exists, no `AGENTS.md` → move its content into the new `AGENTS.md`, the shared source for every harness, and leave `CLAUDE.md` as `@AGENTS.md` plus any lines only Claude Code understands. Say what moved.
    - Both exist and `CLAUDE.md` doesn't import `AGENTS.md` → add `@AGENTS.md` as its first line.
    - `PROJECT.md` exists → resume: ask only about its *Open questions* and missing sections, then update it in place.
-7. **Commit, if the user wants.** A remote still being created → ask once more: the URL now, or stay local. Then ask whether to commit the files as the initial commit, and to push with `git push -u origin <branch>` when a remote is connected. Stage only the files this skill wrote (`git add AGENTS.md CLAUDE.md PROJECT.md`), not `git add -A`, which takes whatever else is in the directory. With `user.name` or `user.email` unset, ask; never invent an identity.
+7. **Commit, if the user wants.** A remote still being created → ask once more: the URL now, or stay local. Then ask whether to commit the files as the initial commit, and to push with `git push -u origin <branch>` when a remote is connected. Stage only the files this skill wrote (`git add AGENTS.md CLAUDE.md PROJECT.md`), and, when `.agents/agentic-toolkit.tsv` exists, what the agentic-toolkit installer put there: the manifest and each path in its `paths` column (such as `.agents/skills/project-init` and `.claude/skills/project-init`), which the installer says to commit. Not `git add -A`, which takes whatever else is in the directory, and not all of `.claude/`, which can hold personal files such as `settings.local.json`. With `user.name` or `user.email` unset, ask; never invent an identity.
 8. **Report**: branch and remote (or local only), files created or changed, the open questions left in `PROJECT.md`, and the next step: planning the first milestone.
 
 ## Gotchas
