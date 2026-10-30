@@ -11,6 +11,7 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ### Changed
 
+- With the plugin and the git hook both installed, the plugin's gate steps aside and the git hook asks, so an unreviewed commit asks once ([ADR 0014](docs/adr/0014-git-hook-layout.md)).
 - The commit gate's message names the skills and stamp command as installed: the project's `code-review` and `doc-sync` copies and `.agents/hooks/commit-gate.sh` when present, the plugin's names otherwise.
 - The installer draws the Entropy Fox as coloured ASCII, so every terminal shows it, including terminals without truecolor or image support, tmux, and `NO_COLOR` (uncoloured) ([ADR 0012](docs/adr/0012-logo-drawn-as-text.md)). It replaces the image and half-blocks, which showed only in truecolor terminals; the name's orange is now a 256-colour index too. At 80 columns, header lines longer than the 37 columns beside the logo wrap.
 - The terminal UI has an orange colour scheme from the Entropy Fox palette: rust borders (fox orange around popups), amber titles and keys, a brown bar on the selected row, tan labels, and status colours (green, yellow, red, blue) in matching mid tones. All are 256-colour indices of middle lightness, so they read on dark and on light backgrounds; `NO_COLOR` keeps bold, dim, and reverse only.

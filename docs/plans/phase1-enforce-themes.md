@@ -16,7 +16,7 @@ Unchanged: [ADR 0004](../adr/0004-configurable-docs-paths.md) (`.commit-gate-doc
 | --- | --- | --- | --- | --- |
 | P0 | This plan; ADRs 0013–0015 accepted (done 2026-10-30) | — | 0013–0015 | 1 |
 | P1 | `--pre-commit` mode and installed-name messages (done 2026-10-30) | P0 | 0013 | 1 |
-| P2 | One gate at a time (plugin defers to the git hook) | P1 | 0014 | 2 |
+| P2 | One gate at a time (plugin defers to the git hook) (done 2026-10-30) | P1 | 0014 | 2 |
 | P3 | `hook` kind in the installer | P1 | 0014 | 3 |
 | P4 | `adr-guard` | P1 | 0015 | 4 |
 | P5 | `adr-index` SessionStart hook | — | — | 5 |
@@ -47,7 +47,11 @@ P5 and P7 depend on nothing and can go in parallel with P1–P4.
 
 **Change.** In plugin mode, after finding `top`: if `$(git -C "$top" rev-parse --git-path hooks/pre-commit)` exists, is executable, and contains `agents/hooks/commit-gate.sh`, exit 0. The git hook will ask instead.
 
+Done (2026-10-30), with one addition: the plugin also requires `.agents/hooks/commit-gate.sh` to exist. The shim fails open without the copy (ADR 0014), so deferring then would leave nobody asking. A relative `--git-path` is resolved against the repository root, so `core.hooksPath` (relative or absolute) counts. The hand-wiring note in `hooks/README.md` now copies the script to `.agents/hooks/` so a hand-made hook is detected too; a hook pointing at the plugin's own script path is not, and asks twice.
+
 **Tests.** Plugin mode with the shim present → allow (no JSON); with a foreign `pre-commit` hook → deny as today; with the shim but `--no-verify` in the command → allow (unchanged).
+
+Covered in `tests/commit-gate.test.sh` ("one gate at a time"): also `commit -a` and a subdirectory deferred; a non-executable shim and a shim without the copy → plugin asks; a foreign hook with the one-line addition → deferred; relative and absolute `core.hooksPath`; and end to end, plugin allows while the real `git commit` is denied by the hook, once.
 
 ## P3. `hook` kind in the installer
 

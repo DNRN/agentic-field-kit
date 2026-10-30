@@ -7,6 +7,8 @@
 #                     the attempted Bash command (a git commit) may proceed.
 #                     Denies with a reason listing the pending check(s) and
 #                     telling the agent to ask the user before committing.
+#                     Allows when git's pre-commit hook runs the project's copy
+#                     of this gate, so the user is asked once (docs/adr/0014).
 #   --pre-commit      git hook mode: run by git's pre-commit hook in every
 #                     harness and terminal. Checks the staged diff (git has
 #                     already staged `commit -a` into its index), prints the
@@ -177,6 +179,17 @@ deny_reason() {
   printf '%s' "Pending before commit ($scope): $pending. Ask the user: 'Run code review / documentation check before committing?' If agreed: $actions For waived checks, rerun the commit with --no-verify."
 }
 
+# git_hook_installed <top>: true when git's pre-commit hook runs the project's
+# copy of this gate (it names agents/hooks/commit-gate.sh, ADR 0014) and that
+# copy exists. The plugin mode then allows: the git hook asks instead, once.
+git_hook_installed() {
+  local hook
+  [ -f "$1/.agents/hooks/commit-gate.sh" ] || return 1
+  hook="$(git -C "$1" rev-parse --git-path hooks/pre-commit 2>/dev/null)" || return 1
+  case "$hook" in /*|[A-Za-z]:*) ;; *) hook="$1/$hook" ;; esac
+  [ -f "$hook" ] && [ -x "$hook" ] && grep -qF 'agents/hooks/commit-gate.sh' "$hook" 2>/dev/null
+}
+
 # --- git hook mode ----------------------------------------------------------
 if [ "${1:-}" = --pre-commit ]; then
   top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
@@ -213,6 +226,7 @@ EOF
 
 top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" || exit 0
 git_dir="$(git -C "$top" rev-parse --absolute-git-dir 2>/dev/null)" || exit 0
+git_hook_installed "$top" && exit 0
 pending_checks "$top" "$git_dir" "$diff_kind" || exit 0
 [ "$review_pending" = yes ] || [ "$docs_pending" = yes ] || exit 0
 
