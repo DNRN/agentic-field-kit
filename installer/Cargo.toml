@@ -1,7 +1,7 @@
 [package]
 name = "agentic-toolkit"
 # The toolkit release: equal to .claude-plugin/plugin.json (tests/release.test.sh).
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.99"
 description = "Install agentic-toolkit components into a project or globally"

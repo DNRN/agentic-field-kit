@@ -4,15 +4,33 @@ Harness-agnostic collection of agent components: skills, subagents, commands, ho
 
 Why this repo starts with an [ADR skill](docs/why-adrs.md): tests verify behavior; ADRs verify design — the missing half of most agent workflows. Why the [code review mechanism](docs/why-code-review.md) is three layers: fresh eyes, right moment, ask instead of nag. Why [docs must be kept true](docs/why-docs-matters.md): agents believe stale docs.
 
+The rules don't depend on the model remembering them: a git hook asks before an unreviewed commit or one that leaves the docs behind, in every harness and in a terminal, and denies edits to Accepted ADRs.
+
+## Components
+
+| Component | Kind | What it does | Where it works |
+| --- | --- | --- | --- |
+| `adr-planning` | skill | Records design decisions as ADRs while planning, on request, or to supersede an Accepted one; briefs you and records your verdict | Every harness |
+| `code-review` | skill | Fresh-eyes review of a diff before commit, with severity-ranked findings and a verdict | Every harness |
+| `doc-sync` | skill | Keeps docs true to the code in the same commit | Every harness |
+| `project-init` | skill | Starts a project: git, a remote if you have one, `AGENTS.md`, `CLAUDE.md`, and `PROJECT.md` from a short dialogue | Every harness |
+| `ship` | skill | On "ship it": review, docs, commit message, commit | Every harness |
+| `code-reviewer` · `doc-auditor` | agent | Read-only subagents with fresh context for the two skills above | Claude Code |
+| `commit-gate` | hook | Asks before unreviewed commits and code changes without docs; denies edits to Accepted ADRs | Every harness as a git `pre-commit` hook (`agentic-toolkit commit-gate`); Claude Code also via the plugin |
+| `adr-index` | hook | Lists the Accepted ADRs at the start of each session | Claude Code, via the plugin |
+
+`agentic-toolkit --list` shows the same list with what is installed where.
+
 ## Compatibility
 
 | Component | Claude Code | Codex | Gemini CLI | OpenCode | Cursor | omp |
 | --- | --- | --- | --- | --- | --- | --- |
 | [`skills/`](skills/) — SKILL.md folders | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [`agents/`](agents/) · [`commands/`](commands/) · [`hooks/`](hooks/) · [`output-styles/`](output-styles/) | ✓ (plugin; agents also via the installer) | adapt | adapt | adapt | adapt | adapt |
+| `commit-gate` as a git hook (via the installer) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [`rules/`](rules/) · [`prompts/`](prompts/) · [`policies/`](policies/) | copy | copy | copy | copy | copy | copy |
 
-Skills follow the [Agent Skills](https://agentskills.io) open standard — identical folders load natively in every harness above. The other component categories currently auto-load only via the Claude Code plugin; adapters for other harnesses are welcome.
+Skills follow the [Agent Skills](https://agentskills.io) open standard — identical folders load natively in every harness above. The commit gate reaches every harness through git, which they all use to commit. The other component categories currently auto-load only via the Claude Code plugin; adapters for other harnesses are welcome.
 
 ## Install
 
@@ -66,7 +84,25 @@ Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#e
 - Gemini CLI loads project skills only in a [trusted folder](https://geminicli.com/docs/cli/trusted-folders/). Gemini CLI and Cursor find them only when started at the repository root.
 - A skill installed both in the project and globally: Codex lists it twice, Claude Code and Cursor use the global copy. `--list` flags it, and a project install offers to remove the global copy.
 - With the plugin enabled at user scope, Claude Code lists a project `code-review` next to the plugin's `agentic-toolkit:code-review`. Enable the plugin for the project instead, or install only the plugin.
-- `commit-gate` (`agentic-toolkit commit-gate`) copies the gate to `.agents/hooks/commit-gate.sh` and writes a small `pre-commit` hook in this clone that runs it, where git looks for hooks (`core.hooksPath` counts). `.git/` isn't committed, so each teammate runs `agentic-toolkit --update` once after cloning; until then `--list` says `inactive`. A `pre-commit` hook the installer didn't write (husky, the pre-commit framework, your own) is never changed: the installer prints a line to add to it. The gate asks before unreviewed commits from any harness and from a terminal; `git commit --no-verify` skips it. With the plugin enabled too, you are asked once.
+
+### The commit gate
+
+`agentic-toolkit commit-gate` copies the gate to `.agents/hooks/commit-gate.sh` (commit it) and writes a small `pre-commit` hook in this clone that runs it, where git looks for hooks (`core.hooksPath` counts) ([ADR 0013](docs/adr/0013-commit-gate-as-git-hook.md), [ADR 0014](docs/adr/0014-git-hook-layout.md)). From then on a commit from any harness or terminal is stopped with a `commit-gate:` message when:
+
+- the staged changes haven't been reviewed: the agent asks you, runs `code-review`, and stamps the reviewed diff;
+- code changed and no doc did: the agent runs `doc-sync` and stamps it (which paths count as docs: [`hooks/README.md`](hooks/README.md#commit-gatesh));
+- an Accepted ADR in `docs/adr/` changed outside its Status section: supersede it with a new ADR instead ([ADR 0015](docs/adr/0015-accepted-adrs-guarded-at-commit.md)).
+
+`git commit --no-verify` skips the gate; that is how you decline a check. `ship` runs the whole flow on request.
+
+- `.git/` isn't committed, so each teammate runs `agentic-toolkit --update` once after cloning; until then `--list` says `inactive`.
+- A `pre-commit` hook the installer didn't write (husky, the pre-commit framework, your own) is never changed. Add this line to it instead; it does nothing once the gate is removed:
+
+  ```sh
+  [ ! -f .agents/hooks/commit-gate.sh ] || bash .agents/hooks/commit-gate.sh --pre-commit || exit 1
+  ```
+
+- With the Claude Code plugin enabled too, its own gate steps aside, so you are asked once.
 
 ### Start a new project
 
@@ -117,7 +153,7 @@ The installer is a native Windows program; it needs no Git Bash or WSL. Project 
 | [`skills/`](skills/) | SKILL.md folders, auto-discovered when relevant | Auto, every harness; [the installer](#install) or the plugin |
 | [`agents/`](agents/) | Subagent definitions (`.md`) | Plugin, or the installer into a project (Claude Code) |
 | [`commands/`](commands/) | Slash commands (`.md`) | Plugin (Claude Code) |
-| [`hooks/`](hooks/) | `hooks/hooks.json` + scripts, event-triggered | Plugin (Claude Code) |
+| [`hooks/`](hooks/) | `hooks/hooks.json` + scripts, event-triggered | Plugin (Claude Code); `commit-gate` also as a git hook via the installer |
 | [`output-styles/`](output-styles/) | Output style / persona definitions | Plugin (Claude Code) |
 | `.mcp.json` | MCP server configs (add with first server) | Plugin (Claude Code) |
 | [`rules/`](rules/) | `AGENTS.md` / `CLAUDE.md` templates | Copy into a project |

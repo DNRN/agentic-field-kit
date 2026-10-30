@@ -15,6 +15,8 @@ Phase 1 comes first because it turns rules the model must remember into determin
 
 ## Phase 1: enforce existing themes
 
+**Status.** Done, released in 0.3.0 (2026-10-30). [Phase 1 plan](phase1-enforce-themes.md) records what was built and where it differs from the table below.
+
 **Starting point.** Components are installed by the `agentic-toolkit` binary, which embeds them ([ADR 0009](../adr/0009-installer-in-rust.md), [ADR 0010](../adr/0010-components-embedded-in-binary.md)), records each install in the manifest ([ADR 0008](../adr/0008-project-install-manifest.md)), and reads `catalog.tsv` ([ADR 0007](../adr/0007-component-catalog.md)). The engine installs the `skill` and `agent` kinds only. `commit-gate` is a Claude Code `PreToolUse` hook that ships with the plugin; its catalog row says `plugin`, and installing it in a project is deferred to this phase ([selective install S5](selective-install.md#s5-commit-gate-outside-the-plugin)). Its review and docs stamps live in `.git/`, so any gate that git runs can read them.
 
 | Component | Type | What it does | ADR |
