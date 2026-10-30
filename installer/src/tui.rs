@@ -20,7 +20,7 @@ use crate::engine::{self, Action, Options};
 use crate::githook::{self, State};
 use crate::list;
 use crate::manifest;
-use crate::scope::{Scope, detected_harnesses, plugin_on};
+use crate::scope::{self, Scope, detected_harnesses, plugin_on};
 use crate::status::{Ctx, is_ours};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +104,10 @@ impl App {
             Scope::Project
         };
         let message = match (&ctx.root, &why) {
+            (None, Some(why)) if !global && why.starts_with(scope::NO_REPO) => format!(
+                "No git repository here: showing the global scope. New project? See {}.",
+                engine::PROJECT_INIT
+            ),
             (None, Some(why)) if !global => format!("{why}. Showing the global scope."),
             _ => String::new(),
         };
@@ -507,6 +511,9 @@ impl App {
                 match engine::apply(&self.ctx, &opts, self.scope, &plan, true) {
                     Ok(done) => {
                         lines.extend(done.messages.iter().cloned());
+                        for name in &done.wrote {
+                            lines.extend(engine::next_step(name, self.scope));
+                        }
                         ok &= !done.skipped;
                         touched_project |= self.scope == Scope::Project
                             && (!done.wrote.is_empty() || done.changed);
@@ -529,7 +536,7 @@ impl App {
             }
         }
         if touched_project && let Some(root) = self.ctx.root.as_deref() {
-            lines.push(engine::commit_hint(root));
+            lines.extend(engine::commit_hint(root));
         }
         lines.push(if ok {
             "done".into()
@@ -704,6 +711,21 @@ fn details(app: &App) -> Text<'static> {
             .collect();
         if !needed_by.is_empty() {
             lines.push(Line::from(format!("Needed by {}.", needed_by.join(", "))));
+        }
+        if row.name == engine::PROJECT_INIT {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled("How to use", title())));
+            lines.push(Line::from(
+                "It runs in your agent, not here: open your agent in the new project's folder and ask it to start the project.",
+            ));
+            if ctx.root.is_none() {
+                lines.push(Line::from("This folder isn't a project yet. Quit and run:"));
+                lines.push(Line::from(format!(
+                    "  agentic-toolkit --project . {}",
+                    engine::PROJECT_INIT
+                )));
+                lines.push(Line::from("or mark it here to install it globally."));
+            }
         }
         match c.harnesses.as_str() {
             "claude" => lines.push(Line::from("Claude Code only.")),
@@ -1201,6 +1223,70 @@ mod tests {
         assert!(f.project.join(".agents/hooks/commit-gate.sh").is_file());
         assert!(f.project.join(".git/hooks/pre-commit").is_file());
         assert_eq!(app.rows[n - 1].project, "installed");
+    }
+
+    /// An app started outside a git repository, as `main` builds it.
+    fn app_without_project(f: &Fixture) -> App {
+        let source = Source::Embedded;
+        let catalog = Catalog::parse(&source.catalog_text().unwrap());
+        let ctx = Ctx {
+            version: source.version(),
+            source,
+            catalog,
+            root: None,
+            home: f.home.clone(),
+        };
+        let opts = Options {
+            force: false,
+            mode_arg: None,
+            mode: Mode::Copy,
+            harnesses: Vec::new(),
+        };
+        let why = format!("{}: run agentic-toolkit from your project", scope::NO_REPO);
+        App::new(ctx, opts, false, false, Some(why))
+    }
+
+    #[test]
+    fn outside_a_repository_it_points_at_project_init() {
+        let f = fixture();
+        let mut app = app_without_project(&f);
+        assert_eq!(app.scope, Scope::Global);
+        assert!(app.message.contains("See project-init"), "{}", app.message);
+        let n = row(&app, "project-init");
+        app.cursor = n - 1;
+        let text = screen(&app, 120, 40);
+        assert!(text.contains("How to use"), "{text}");
+        assert!(
+            text.contains("agentic-toolkit --project . project-init"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn inside_a_project_the_detail_says_project_init_runs_in_the_agent() {
+        let f = fixture();
+        let mut app = app(&f);
+        let n = row(&app, "project-init");
+        app.cursor = n - 1;
+        let text = screen(&app, 120, 40);
+        assert!(text.contains("It runs in your agent"), "{text}");
+        assert!(!text.contains("--project ."), "{text}");
+    }
+
+    #[test]
+    fn installing_project_init_says_what_to_do_next() {
+        let f = fixture();
+        let mut app = app(&f);
+        let n = row(&app, "project-init");
+        press(&mut app, &format!("{n}\ny"));
+        assert!(!app.failed, "{:?}", app.log);
+        assert!(
+            app.log
+                .iter()
+                .any(|l| l.starts_with("Next: open your agent")),
+            "{:?}",
+            app.log
+        );
     }
 
     #[test]

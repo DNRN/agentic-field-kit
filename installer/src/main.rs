@@ -130,16 +130,20 @@ fn run(
             println!("{line}");
         }
         ok &= !applied.skipped;
+        for name in &applied.wrote {
+            if let Some(next) = engine::next_step(name, scope) {
+                println!("{next}");
+            }
+        }
     }
     if scope == Scope::Project {
         if action == Action::Install {
             ok &= warn_both_scopes(ctx, &plan, run);
         }
-        if !applied.wrote.is_empty() || applied.changed {
-            println!(
-                "{}",
-                engine::commit_hint(ctx.root.as_deref().expect("project root"))
-            );
+        if (!applied.wrote.is_empty() || applied.changed)
+            && let Some(hint) = engine::commit_hint(ctx.root.as_deref().expect("project root"))
+        {
+            println!("{hint}");
         }
     }
     if plan.has_changes() {
@@ -357,7 +361,14 @@ fn main() -> ExitCode {
     } else if ctx.root.is_some() {
         Scope::Project
     } else {
-        return die(why.as_deref().unwrap_or("no project"));
+        let why = why.as_deref().unwrap_or("no project");
+        let code = die(why);
+        if why.starts_with(scope::NO_REPO) {
+            for line in engine::new_project_hint() {
+                eprintln!("{line}");
+            }
+        }
+        return code;
     };
     let flags = Run {
         dry_run: args.dry_run,

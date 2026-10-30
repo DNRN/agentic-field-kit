@@ -64,6 +64,10 @@ pub fn is_toolkit_tree(dir: &Path) -> bool {
             .is_some_and(|n| n == "agentic-toolkit")
 }
 
+/// The start of the reason there is no project when the working directory is
+/// outside a git repository; callers add how to start a new project.
+pub const NO_REPO: &str = "not inside a git repository";
+
 /// The project root, or why there is none.
 pub fn project(project_arg: Option<&Path>, source: &Source) -> Result<PathBuf, String> {
     let root = match project_arg {
@@ -75,7 +79,9 @@ pub fn project(project_arg: Option<&Path>, source: &Source) -> Result<PathBuf, S
             match cwd.as_deref().and_then(git_root) {
                 Some(root) => root,
                 None => {
-                    return Err("not inside a git repository: run agentic-toolkit from your project, or use --project DIR or --global".into());
+                    return Err(format!(
+                        "{NO_REPO}: run agentic-toolkit from your project, or use --project DIR or --global"
+                    ));
                 }
             }
         }

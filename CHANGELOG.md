@@ -16,6 +16,7 @@ Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachan
 
 ### Changed
 
+- Outside a git repository the installer explains how to start a project: the error and the menu point at `agentic-toolkit --project . project-init`, `project-init`'s details say it runs in your agent, and installing it ends with "Next: open your agent … and ask it to start the project". It no longer suggests a `git add` in a folder without git. The README has a "Start a new project" section.
 - At 80×24 the terminal UI keeps the Entropy Fox and shows 7 component rows; the rest scroll into view with the cursor (the catalog now has 9).
 - With the plugin and the git hook both installed, the plugin's gate steps aside and the git hook asks, so an unreviewed commit asks once ([ADR 0014](docs/adr/0014-git-hook-layout.md)).
 - The commit gate's message names the skills and stamp command as installed: the project's `code-review` and `doc-sync` copies and `.agents/hooks/commit-gate.sh` when present, the plugin's names otherwise.

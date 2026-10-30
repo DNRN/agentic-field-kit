@@ -68,6 +68,23 @@ Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#e
 - With the plugin enabled at user scope, Claude Code lists a project `code-review` next to the plugin's `agentic-toolkit:code-review`. Enable the plugin for the project instead, or install only the plugin.
 - `commit-gate` (`agentic-toolkit commit-gate`) copies the gate to `.agents/hooks/commit-gate.sh` and writes a small `pre-commit` hook in this clone that runs it, where git looks for hooks (`core.hooksPath` counts). `.git/` isn't committed, so each teammate runs `agentic-toolkit --update` once after cloning; until then `--list` says `inactive`. A `pre-commit` hook the installer didn't write (husky, the pre-commit framework, your own) is never changed: the installer prints a line to add to it. The gate asks before unreviewed commits from any harness and from a terminal; `git commit --no-verify` skips it. With the plugin enabled too, you are asked once.
 
+### Start a new project
+
+The installer copies components; it doesn't create projects. Starting one is the `project-init` skill's job, and it runs in your agent: it sets up git (and a remote, if you have one), writes `AGENTS.md`, a `CLAUDE.md` that imports it, and `PROJECT.md` from a few questions you can skip.
+
+1. Put the skill where your agent will find it. An empty folder isn't a git repository yet, so name it as the project:
+
+   ```bash
+   mkdir my-project && cd my-project
+   agentic-toolkit --project . project-init
+   ```
+
+   Or once for every folder: `agentic-toolkit --global project-init`. With the Claude Code plugin it is already there as `/agentic-toolkit:project-init`.
+2. Open your agent in the folder and ask it to start the project.
+3. Install the rest from the new repository as usual, such as `agentic-toolkit commit-gate`.
+
+Run `agentic-toolkit` in a folder without git, and it says the same: the menu points at `project-init`, its details show the command, and installing it ends with the next step.
+
 ### Global install
 
 For a skill you want in every repository, such as `adr-planning`, or one you use before a repository exists, such as `project-init`: `agentic-toolkit --global NAME`. Global installs are copies. With `--source DIR` they are symlinks into that toolkit folder instead, except on Windows, where copies stay the default (`--mode symlink` needs Developer Mode); `--mode` picks either, and `--update` keeps each install's form.

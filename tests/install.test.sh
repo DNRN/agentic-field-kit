@@ -373,6 +373,16 @@ git config core.hooksPath .husky
 check "hook: core.hooksPath decides where the shim goes" holds '[ -x "$P/.husky/pre-commit" ] && [ ! -e "$P/.git/hooks/pre-commit" ]'
 cd "$TMP" || exit 1
 
+# ---- a new project: project-init outside a git repository ------------------------
+E="$TMP/empty"; mkdir -p "$E"; cd "$E" || exit 1
+out="$("$I" project-init 2>&1)"; rc=$?
+check "no repository: install fails and says how to start a project here" holds '[ "$rc" -ne 0 ] && printf "%s" "$out" | grep -qF -- "--project . project-init" && [ ! -e "$E/.agents" ]'
+out="$("$I" --project . project-init 2>&1)"
+check "--project .: project-init installs into the empty folder" [ -f "$E/.agents/skills/project-init/SKILL.md" ]
+check "--project .: says to ask the agent next" holds 'printf "%s" "$out" | grep -q "^Next: open your agent"'
+check "--project .: no commit hint before git exists" holds '! printf "%s" "$out" | grep -q "Commit the changes"'
+cd "$TMP" || exit 1
+
 # ---- --source paths, usage errors -----------------------------------------------
 (cd "$TMP" && "$BIN" --source ./home/../toolkit --global --mode symlink adr-planning >/dev/null)
 check "relative --source: links point at the resolved toolkit path, no .." holds 'L="$HOME/.agents/skills/adr-planning"; [ -L "$L" ] && [ -d "$L" ] && ! readlink "$L" | grep -q "\.\."'
