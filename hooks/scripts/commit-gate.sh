@@ -27,6 +27,10 @@
 #   docs    pending when the diff changes code without touching any doc, the
 #           repo tracks at least one doc, and the code-diff hash is not
 #           stamped. A commit that edits docs is evidence docs were considered.
+#   adr     (--pre-commit only) a staged change to an Accepted ADR,
+#           docs/adr/NNNN-*.md, outside its `## Status` section, or its
+#           deletion or rename. No stamp: write a superseding ADR, or
+#           --no-verify. See docs/adr/0015.
 #
 # What counts as a doc: git pathspecs in .commit-gate-docs at the repository
 # root, one per line (`docs/`, `README.md`, `*.rst`, long-form magic such as
@@ -190,12 +194,65 @@ git_hook_installed() {
   [ -f "$hook" ] && [ -x "$hook" ] && grep -qF 'agents/hooks/commit-gate.sh' "$hook" 2>/dev/null
 }
 
+# without_status: an ADR on stdin, carriage returns and the `## Status`
+# section (its heading up to the next `## ` heading) removed.
+without_status() {
+  tr -d '\r' | awk '/^## /{ skip = ($0 ~ /^## Status[[:space:]]*$/) } !skip'
+}
+
+# accepted: true when the ADR on stdin has a `## Status` section whose first
+# non-blank line starts with `Accepted`. Any other shape is not Accepted, so
+# the check fails open on formats it doesn't know.
+accepted() {
+  tr -d '\r' | awk '
+    /^## / { if (in_status) exit; in_status = ($0 ~ /^## Status[[:space:]]*$/); next }
+    in_status && NF { found = ($0 ~ /^Accepted/); exit }
+    END { exit !found }'
+}
+
+# adr_violations <top>: print each staged change to an Accepted ADR that ADR
+# 0015 denies, one per line ("<path> (edited|deleted|renamed)"). Prints
+# nothing on any git error (no HEAD yet, not a repo): fail open.
+adr_violations() {
+  local top="$1" st path old
+  git -C "$top" diff --cached -z --name-status -M HEAD -- 'docs/adr/' 2>/dev/null |
+    while IFS= read -r -d '' st; do
+      case "$st" in
+        R*|C*) IFS= read -r -d '' old || break; IFS= read -r -d '' path || break ;;
+        *) IFS= read -r -d '' old || break; path="$old" ;;
+      esac
+      case "$st" in M|D|R*) ;; *) continue ;; esac
+      case "${old##*/}" in [0-9][0-9][0-9][0-9]-*.md) ;; *) continue ;; esac
+      [ "${old%/*}" = docs/adr ] || continue
+      git -C "$top" show "HEAD:$old" 2>/dev/null | accepted || continue
+      case "$st" in
+        D) echo "$old (deleted)" ;;
+        R*) echo "$old (renamed to $path)" ;;
+        M)
+          if [ "$(git -C "$top" show "HEAD:$old" 2>/dev/null | without_status | hash_of)" != \
+               "$(git -C "$top" show ":$old" 2>/dev/null | without_status | hash_of)" ]; then
+            echo "$old (edited outside Status)"
+          fi ;;
+      esac
+    done
+}
+
 # --- git hook mode ----------------------------------------------------------
 if [ "${1:-}" = --pre-commit ]; then
   top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
   git_dir="$(git -C "$top" rev-parse --absolute-git-dir 2>/dev/null)" || exit 0
-  pending_checks "$top" "$git_dir" --cached || exit 0
-  [ "$review_pending" = yes ] || [ "$docs_pending" = yes ] || exit 0
+  adrs="$(adr_violations "$top")"
+  adr_reason=""
+  if [ -n "$adrs" ]; then
+    adr_reason="Accepted ADRs are immutable (docs/adr/0015): ${adrs//$'\n'/; }. Only an ADR's Status section may change after it is Accepted. Revert these changes, write a superseding ADR with the adr-planning skill, and change only the old ADR's Status (Superseded by NNNN). If the user says to commit them anyway, rerun the commit with --no-verify."
+  fi
+  review_pending=no; docs_pending=no
+  pending_checks "$top" "$git_dir" --cached || { review_pending=no; docs_pending=no; }
+  if [ "$review_pending" = no ] && [ "$docs_pending" = no ]; then
+    [ -n "$adr_reason" ] || exit 0
+    echo "commit-gate: $adr_reason" >&2
+    exit 1
+  fi
   # The hook can't see `-a`: git commits from its own index file then. Name
   # the staged stamp when the user's index (what --stamp-review hashes) holds
   # this diff, the --all stamp otherwise; it matches under `commit -a`.
@@ -205,6 +262,7 @@ if [ "${1:-}" = --pre-commit ]; then
     kind=HEAD
   fi
   echo "commit-gate: $(deny_reason "$top" "$kind")" >&2
+  [ -z "$adr_reason" ] || echo "commit-gate: $adr_reason" >&2
   exit 1
 fi
 

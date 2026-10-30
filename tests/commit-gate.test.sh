@@ -257,6 +257,92 @@ if [ "$rc" -eq 0 ] && [ -z "$out" ]; then echo "ok   outside a repository: silen
 out="$(cd "$REPO" && git reset -q && env -i PATH=/usr/bin:/bin bash "$GATE" --pre-commit 2>&1)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ]; then echo "ok   nothing staged: silent allow"; else echo "FAIL nothing staged: rc=$rc out=$out"; fails=$((fails + 1)); fi
 
+echo "# adr-guard (--pre-commit)"
+# adr <file> <status> [crlf]: an ADR with a Status section and a body.
+adr() {
+  local nl='\n'; [ "${3:-}" = crlf ] && nl='\r\n'
+  mkdir -p "$REPO/docs/adr"
+  printf "# 0001. Use X${nl}${nl}Date: 2026-10-30${nl}${nl}## Status${nl}${nl}%s${nl}${nl}## Context${nl}${nl}Forces.${nl}${nl}## Decision${nl}${nl}We will use X.${nl}" "$2" > "$REPO/docs/adr/$1"
+}
+adr_repo() { # fresh hook repo with committed ADRs; review stamps are made per test
+  hook_repo
+  adr 0001-accepted.md Accepted
+  adr 0002-proposed.md Proposed
+  adr 0003-crlf.md Accepted crlf
+  adr 0004-partial.md "Accepted. Item 2 superseded by [0009](0009-x.md)."
+  printf '# Not an ADR\n\n## Status\n\nAccepted\n' > "$REPO/docs/adr/README.md"
+  printf '# 0005. Odd\n\n**Status:** Accepted\n\nBody.\n' > "$REPO/docs/adr/0005-odd.md"
+  git -C "$REPO" add -A; git -C "$REPO" commit -qm adrs --no-verify
+}
+# adr_commit <ok|denied> <description>: stamp review and docs for what is
+# staged, so only the ADR check can deny, then commit.
+adr_commit() {
+  stamp --stamp-review "$REPO"; stamp --stamp-docs "$REPO"
+  expect_commit "$1" "$2" -m x
+}
+adr_repo
+sed -i.bak 's/Forces\./Other forces./' "$REPO/docs/adr/0001-accepted.md"; git -C "$REPO" add docs/adr/0001-accepted.md
+adr_commit denied "editing an Accepted ADR's Context is denied"
+expect_last "docs/adr/0001-accepted.md (edited outside Status)" "the denial names the ADR"
+expect_last "superseding ADR" "the denial says to supersede"
+expect_last "--no-verify" "the denial names the waiver"
+expect_commit ok "--no-verify waives it" --no-verify -m x
+
+adr_repo
+sed -i.bak 's/^Accepted$/Superseded by [0016](0016-y.md)/' "$REPO/docs/adr/0001-accepted.md"; git -C "$REPO" add docs/adr/0001-accepted.md
+adr_commit ok "changing only the Status to Superseded by is allowed"
+adr_repo
+adr 0001-accepted.md "$(printf 'Accepted\n\nPlan: [p](../plans/p.md). Item 1 superseded by 0016.')"; git -C "$REPO" add docs/adr/0001-accepted.md
+adr_commit ok "adding a note under Status is allowed"
+sed -i.bak 's/We will use X\./We will use Y./' "$REPO/docs/adr/0004-partial.md"; git -C "$REPO" add docs/adr/0004-partial.md
+adr_commit denied "a partly superseded ADR (Accepted. ...) is still guarded"
+
+adr_repo
+sed -i.bak 's/Forces\./Other forces./' "$REPO/docs/adr/0002-proposed.md"; git -C "$REPO" add docs/adr/0002-proposed.md
+adr_commit ok "editing a Proposed ADR is allowed"
+sed -i.bak 's/^Proposed$/Accepted/' "$REPO/docs/adr/0002-proposed.md"; git -C "$REPO" add docs/adr/0002-proposed.md
+adr_commit ok "accepting a Proposed ADR is allowed"
+
+adr_repo
+git -C "$REPO" rm -q docs/adr/0001-accepted.md
+adr_commit denied "deleting an Accepted ADR is denied"
+expect_last "0001-accepted.md (deleted)" "the denial says deleted"
+adr_repo
+git -C "$REPO" mv docs/adr/0001-accepted.md docs/adr/0001-renamed.md
+adr_commit denied "renaming an Accepted ADR is denied"
+expect_last "0001-accepted.md (renamed to docs/adr/0001-renamed.md)" "the denial names both paths"
+
+adr_repo
+adr 0006-new.md Accepted; git -C "$REPO" add docs/adr/0006-new.md
+adr_commit ok "a new ADR is allowed, even Accepted"
+sed -i.bak 's/Accepted/Rejected/' "$REPO/docs/adr/README.md"; git -C "$REPO" add docs/adr/README.md
+adr_commit ok "files that aren't NNNN-*.md are not ADRs"
+sed -i.bak 's/Body\./Changed./' "$REPO/docs/adr/0005-odd.md"; git -C "$REPO" add docs/adr/0005-odd.md
+adr_commit ok "an unknown Status format fails open"
+
+adr_repo
+adr 0003-crlf.md "Superseded by 0016" crlf; git -C "$REPO" add docs/adr/0003-crlf.md
+adr_commit ok "CRLF ADR: Status-only change allowed"
+sed -i.bak 's/Forces\./Other./' "$REPO/docs/adr/0003-crlf.md"; git -C "$REPO" add docs/adr/0003-crlf.md
+adr_commit ok "CRLF ADR, no longer Accepted at HEAD: edit allowed"
+adr_repo
+tr -d '\r' < "$REPO/docs/adr/0003-crlf.md" > "$REPO/x" && mv "$REPO/x" "$REPO/docs/adr/0003-crlf.md"; git -C "$REPO" add docs/adr/0003-crlf.md
+adr_commit ok "CRLF to LF conversion is not an edit"
+sed -i.bak 's/Forces\./Other./' "$REPO/docs/adr/0003-crlf.md"; git -C "$REPO" add docs/adr/0003-crlf.md
+adr_commit denied "CRLF Accepted ADR: body edit denied"
+
+adr_repo
+stage code.py
+sed -i.bak 's/Forces\./Other forces./' "$REPO/docs/adr/0001-accepted.md"; git -C "$REPO" add docs/adr/0001-accepted.md
+expect_commit denied "unreviewed change plus ADR edit" -m x
+expect_last "code review (unreviewed changes)" "one denial lists the review check"
+expect_last "Accepted ADRs are immutable" "and the ADR check"
+
+hook_repo
+mkdir -p "$REPO/docs/adr"; adr 0001-a.md Accepted; git -C "$REPO" add -A
+out="$(cd "$WORK" && rm -rf first && git init -q first && cd first && cp -R "$REPO/docs" . && git add -A && env -i PATH=/usr/bin:/bin bash "$GATE" --pre-commit 2>&1)"
+case "$out" in *"immutable"*) echo "FAIL first commit (no HEAD) must not trip the ADR check"; fails=$((fails + 1)) ;; *) echo "ok   first commit (no HEAD): no ADR check" ;; esac
+
 echo "# one gate at a time"
 # install_copy: the project's copy of the gate, as the installer writes it.
 install_copy() { mkdir -p "$REPO/.agents/hooks"; cp "$GATE" "$REPO/.agents/hooks/commit-gate.sh"; }

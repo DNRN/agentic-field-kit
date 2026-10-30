@@ -63,5 +63,5 @@ Trivial choices - naming, formatting, single-file changes, library upgrades with
 
 - One page max per ADR. If it grows into a design document, the design doc is a separate file the ADR links to.
 - Never leave decisions only in chat, commit messages, or PR descriptions.
-- Never rewrite an Accepted ADR - supersede it. The history is the point.
+- Never rewrite an Accepted ADR - supersede it. The history is the point. Where the commit gate runs as a git hook, a commit that edits an Accepted ADR outside its Status section is denied.
 - If the user's request contradicts an existing Accepted ADR, surface the conflict and propose a superseding ADR instead of silently deviating.
