@@ -491,13 +491,11 @@ impl App {
             }
             "foreign" => {
                 self.message = format!(
-                    "{}: exists but was not installed by agentic-toolkit; left alone",
+                    "{}: exists but was not installed by afk; left alone",
                     row.name
                 )
             }
-            "plugin" => {
-                self.message = format!("{}: provided by the agentic-toolkit plugin", row.name)
-            }
+            "plugin" => self.message = format!("{}: provided by the afk plugin", row.name),
             "n/a" => {
                 let plugin_only = self
                     .ctx
@@ -742,9 +740,7 @@ impl App {
                 for (name, g) in engine::both_scopes(&self.ctx, &plan) {
                     lines.push(engine::both_scopes_warning(&name, &g));
                     if g != "foreign" {
-                        lines.push(format!(
-                            "  Remove it with: agentic-toolkit --global --remove {name}"
-                        ));
+                        lines.push(format!("  Remove it with: afk --global --remove {name}"));
                     }
                 }
             }
@@ -874,7 +870,7 @@ fn title_line(app: &App) -> Line<'static> {
     Line::from(vec![
         Span::styled(brand::NAME, accent()),
         Span::styled(" · ", dim()),
-        Span::raw(format!("agentic-toolkit {}", app.ctx.version)),
+        Span::raw(format!("Agentic Field Kit {}", app.ctx.version)),
     ])
 }
 
@@ -1001,7 +997,7 @@ fn no_agent_lines(shown: &str) -> Vec<String> {
     let known: Vec<&str> = agents::AGENTS.iter().map(|a| a.command).collect();
     vec![
         format!(
-            "No agent that agentic-toolkit can start was found on PATH ({}).",
+            "No agent that afk can start was found on PATH ({}).",
             known.join(", ")
         ),
         format!("Next: open your agent in {shown} and ask it to start the project."),
@@ -1036,7 +1032,7 @@ fn header(app: &App) -> Vec<Line<'static>> {
         Line::from(vec![
             Span::styled(brand::NAME, accent()),
             Span::styled(" · ", dim()),
-            Span::raw(format!("agentic-toolkit {}", ctx.version)),
+            Span::raw(format!("Agentic Field Kit {}", ctx.version)),
         ]),
         Line::from(""),
         field("Project  ", project),
@@ -1078,7 +1074,7 @@ fn details(app: &App) -> Text<'static> {
             if ctx.root.is_none() {
                 lines.push(Line::from("This folder isn't a project yet. Quit and run:"));
                 lines.push(Line::from(format!(
-                    "  agentic-toolkit --project . {}",
+                    "  afk --project . {}",
                     engine::PROJECT_INIT
                 )));
                 lines.push(Line::from("or mark it here to install it globally."));
@@ -1608,7 +1604,7 @@ mod tests {
             mode: Mode::Copy,
             harnesses: Vec::new(),
         };
-        let why = format!("{}: run agentic-toolkit from your project", scope::NO_REPO);
+        let why = format!("{}: run afk from your project", scope::NO_REPO);
         App::new(ctx, opts, false, false, Some(why))
     }
 
@@ -1622,10 +1618,7 @@ mod tests {
         app.cursor = n - 1;
         let text = screen(&app, 120, 40);
         assert!(text.contains("How to use"), "{text}");
-        assert!(
-            text.contains("agentic-toolkit --project . project-init"),
-            "{text}"
-        );
+        assert!(text.contains("afk --project . project-init"), "{text}");
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! The per-clone half of a `hook` component (ADR 0014): a shim at git's
 //! `pre-commit` path that runs the committed copy at `.agents/hooks/<name>.sh`.
 //! The manifest records the copy, never the shim. A `pre-commit` hook that
-//! agentic-toolkit didn't write is never changed.
+//! afk didn't write is never changed.
 
 use std::fs;
 use std::io;
@@ -15,7 +15,22 @@ pub fn copy_path(name: &str) -> String {
 
 /// The first lines of every shim; how the installer knows the file is its own.
 pub fn marker(name: &str) -> String {
+    format!("# afk {name}")
+}
+
+/// The marker shims had before the rename (ADR 0018). Still ours, so
+/// `--update` rewrites them and `--remove` deletes them.
+fn legacy_marker(name: &str) -> String {
     format!("# agentic-toolkit {name}")
+}
+
+/// git's `pre-commit` hook when it is a shim with the legacy marker.
+pub fn legacy_shim(root: &Path, name: &str) -> Option<PathBuf> {
+    let path = pre_commit_path(root)?;
+    let text = fs::read_to_string(&path).ok()?;
+    text.lines()
+        .any(|l| l.trim_end() == legacy_marker(name))
+        .then_some(path)
 }
 
 /// The line to add to a `pre-commit` hook the installer doesn't own. Git runs
@@ -100,7 +115,8 @@ pub fn state(root: &Path, name: &str) -> State {
         };
     };
     let text = String::from_utf8_lossy(&bytes);
-    if text.lines().any(|l| l.trim_end() == marker(name)) {
+    let ours = [marker(name), legacy_marker(name)];
+    if text.lines().any(|l| ours.iter().any(|m| l.trim_end() == m)) {
         State::Ours(path)
     } else if text.contains(&copy_path(name)[1..]) {
         // `agents/hooks/<name>.sh`, as the plugin gate detects it.
@@ -155,7 +171,7 @@ mod tests {
     #[test]
     fn shim_runs_the_copy_and_fails_open() {
         let s = shim("commit-gate");
-        assert!(s.starts_with("#!/bin/sh\n# agentic-toolkit commit-gate\n"));
+        assert!(s.starts_with("#!/bin/sh\n# afk commit-gate\n"));
         assert!(s.contains("/.agents/hooks/commit-gate.sh\""));
         assert!(s.contains("[ -f \"$gate\" ] || exit 0"));
         assert!(s.contains("--pre-commit"));
@@ -182,6 +198,19 @@ mod tests {
         )
         .unwrap();
         assert_eq!(state(root, "commit-gate"), State::Runs(hook));
+    }
+
+    #[test]
+    fn a_shim_from_before_the_rename_is_ours() {
+        let tmp = repo();
+        let root = tmp.path();
+        let hook = pre_commit_path(root).unwrap();
+        fs::write(
+            &hook,
+            shim("commit-gate").replace("# afk ", "# agentic-toolkit "),
+        )
+        .unwrap();
+        assert_eq!(state(root, "commit-gate"), State::Ours(hook));
     }
 
     #[test]

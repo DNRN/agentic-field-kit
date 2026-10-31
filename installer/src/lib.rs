@@ -1,4 +1,4 @@
-//! agentic-toolkit's installer (ADR 0009). The command line and the terminal
+//! The afk installer (ADR 0009). The command line and the terminal
 //! UI are thin layers over these modules; only the engine writes files.
 
 #![forbid(unsafe_code)]

@@ -25,13 +25,7 @@ pub fn table(ctx: &Ctx, why: Option<&str>) -> String {
     let mut plug = "not enabled";
     match (&ctx.root, why) {
         (Some(root), _) => {
-            writeln!(
-                out,
-                "agentic-toolkit {} → project {}",
-                ctx.version,
-                root.display()
-            )
-            .unwrap();
+            writeln!(out, "afk {} → project {}", ctx.version, root.display()).unwrap();
             if plugin_on(root) {
                 plug = "enabled for this project";
             }
@@ -40,7 +34,7 @@ pub fn table(ctx: &Ctx, why: Option<&str>) -> String {
             let why = why.unwrap_or_default();
             writeln!(
                 out,
-                "agentic-toolkit {} → no project ({})",
+                "afk {} → no project ({})",
                 ctx.version,
                 why.split(':').next().unwrap_or_default()
             )

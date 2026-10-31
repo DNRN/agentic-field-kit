@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "agentic-toolkit"
+name = "agentic-field-kit"
 version = "0.3.0"
 dependencies = [
  "clap",

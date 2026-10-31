@@ -259,10 +259,7 @@ fn plan_write(
     match ctx.avail(scope, name) {
         "" => {}
         "plugin" => {
-            return plan.skip(
-                name,
-                "provided by the agentic-toolkit plugin enabled for this scope",
-            );
+            return plan.skip(name, "provided by the afk plugin enabled for this scope");
         }
         _ => {
             let note = match ctx.component(name) {
@@ -284,10 +281,7 @@ fn plan_write(
     {
         return plan.skip(
             name,
-            &format!(
-                "{} exists, not installed by agentic-toolkit",
-                disp(scope, p)
-            ),
+            &format!("{} exists, not installed by afk", disp(scope, p)),
         );
     }
     let row = manifest::row(root, name);
@@ -372,11 +366,9 @@ pub const PROJECT_INIT: &str = "project-init";
 pub fn new_project_hint() -> Vec<String> {
     vec![
         format!(
-            "To start a new project in this folder: agentic-toolkit --project . {PROJECT_INIT}, then open your agent here and ask it to start the project."
+            "To start a new project in this folder: afk --project . {PROJECT_INIT}, then open your agent here and ask it to start the project."
         ),
-        format!(
-            "To have {PROJECT_INIT} in every folder instead: agentic-toolkit --global {PROJECT_INIT}."
-        ),
+        format!("To have {PROJECT_INIT} in every folder instead: afk --global {PROJECT_INIT}."),
     ]
 }
 
@@ -551,7 +543,7 @@ pub fn plan_remove(
             if is_ours(&ctx.status(scope, n)) {
                 targets.push(n.clone());
             } else {
-                plan.skip(n, "not installed by agentic-toolkit here");
+                plan.skip(n, "not installed by afk here");
             }
         }
     }
@@ -576,7 +568,7 @@ pub fn plan_remove(
             }
             if !edited.contains(m) {
                 return Err(format!(
-                    "{r} is required by {m}; remove both: agentic-toolkit --remove {r} {m}"
+                    "{r} is required by {m}; remove both: afk --remove {r} {m}"
                 ));
             }
             plan.skip(
@@ -874,10 +866,37 @@ fn enable_hook(root: &Path, name: &str, done: &mut Applied) -> io::Result<()> {
             githook::line_to_add(name)
         )),
         State::NoRepo => done.messages.push(format!(
-            "{name}: not a git repository, so the hook is not enabled; run agentic-toolkit --update after git init"
+            "{name}: not a git repository, so the hook is not enabled; run afk --update after git init"
         )),
     }
     Ok(())
+}
+
+/// Moves what was written under the name before the rename (ADR 0018) to the
+/// new one: the manifest, and in a project each hook's shim. The lines to print.
+pub fn rename_legacy(scope: Scope, root: &Path) -> io::Result<Vec<String>> {
+    let mut out = Vec::new();
+    if manifest::move_legacy(root)? {
+        out.push(format!(
+            "  {:<7} .agents/agentic-toolkit.tsv → .agents/afk.tsv",
+            "rename"
+        ));
+    }
+    if scope == Scope::Project {
+        for row in manifest::rows(root) {
+            if row.kind == "hook"
+                && let Some(p) = githook::legacy_shim(root, &row.name)
+            {
+                githook::write_shim(&p, &row.name).map_err(|e| with_path(&p, e))?;
+                out.push(format!(
+                    "  {:<7} {}  (renamed marker)",
+                    "hook",
+                    githook::disp(root, &p)
+                ));
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Carries out the plan. `can_ask_remove` as for [`show`].
@@ -1136,6 +1155,30 @@ mod tests {
     }
 
     #[test]
+    fn names_from_before_the_rename_are_moved() {
+        let f = fixture();
+        let ctx = ctx(&f);
+        install(&ctx, Scope::Project, &["commit-gate"]);
+        let agents = f.project.join(".agents");
+        fs::rename(agents.join("afk.tsv"), agents.join("agentic-toolkit.tsv")).unwrap();
+        let old_shim = githook::shim("commit-gate").replace("# afk ", "# agentic-toolkit ");
+        fs::write(hook_file(&f), old_shim).unwrap();
+        assert_eq!(ctx.status(Scope::Project, "commit-gate"), "installed");
+        let moved = rename_legacy(Scope::Project, &f.project).unwrap();
+        assert_eq!(moved.len(), 2, "{moved:?}");
+        assert!(agents.join("afk.tsv").is_file() && !agents.join("agentic-toolkit.tsv").exists());
+        assert_eq!(
+            fs::read_to_string(hook_file(&f)).unwrap(),
+            githook::shim("commit-gate")
+        );
+        assert!(
+            rename_legacy(Scope::Project, &f.project)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn a_missing_shim_is_inactive_and_update_restores_it() {
         let f = fixture();
         let ctx = ctx(&f);
@@ -1314,10 +1357,10 @@ mod legacy_link_tests {
     fn a_link_into_an_agentic_toolkit_clone_is_ours_also_when_relative() {
         let tmp = tempfile::tempdir().unwrap();
         let home = tmp.path().join("home");
-        tree(&home.join("src/agentic-toolkit"), Some("agentic-toolkit"));
+        tree(&home.join("src/afk"), Some("afk"));
         fs::create_dir_all(home.join(".claude/skills")).unwrap();
         symlink(
-            "../../src/agentic-toolkit/skills/doc-sync",
+            "../../src/afk/skills/doc-sync",
             home.join(".claude/skills/doc-sync"),
         )
         .unwrap();
@@ -1328,10 +1371,10 @@ mod legacy_link_tests {
     fn a_link_to_another_component_of_the_clone_is_not_ours() {
         let tmp = tempfile::tempdir().unwrap();
         let home = tmp.path().join("home");
-        tree(&home.join("src/agentic-toolkit"), Some("agentic-toolkit"));
+        tree(&home.join("src/afk"), Some("afk"));
         fs::create_dir_all(home.join(".agents/skills")).unwrap();
         symlink(
-            home.join("src/agentic-toolkit/skills/doc-sync"),
+            home.join("src/afk/skills/doc-sync"),
             home.join(".agents/skills/code-review"),
         )
         .unwrap();

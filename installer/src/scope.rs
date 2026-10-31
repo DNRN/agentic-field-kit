@@ -54,14 +54,14 @@ fn git_root(dir: &Path) -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
-/// A folder that looks like an agentic-toolkit tree: a catalog and a plugin
-/// manifest named agentic-toolkit.
+/// A folder that looks like an afk tree: a catalog and a plugin
+/// manifest named afk, or agentic-toolkit before the rename (ADR 0018).
 pub fn is_toolkit_tree(dir: &Path) -> bool {
     dir.join("catalog.tsv").is_file()
         && fs::read_to_string(dir.join(".claude-plugin/plugin.json"))
             .ok()
             .and_then(|t| json_string_field(&t, "name"))
-            .is_some_and(|n| n == "agentic-toolkit")
+            .is_some_and(|n| PLUGIN_NAMES.contains(&n.as_str()))
 }
 
 /// The start of the reason there is no project when the working directory is
@@ -80,7 +80,7 @@ pub fn project(project_arg: Option<&Path>, source: &Source) -> Result<PathBuf, S
                 Some(root) => root,
                 None => {
                     return Err(format!(
-                        "{NO_REPO}: run agentic-toolkit from your project, or use --project DIR or --global"
+                        "{NO_REPO}: run afk from your project, or use --project DIR or --global"
                     ));
                 }
             }
@@ -91,7 +91,10 @@ pub fn project(project_arg: Option<&Path>, source: &Source) -> Result<PathBuf, S
         None => is_toolkit_tree(&root),
     };
     if is_source {
-        return Err("this is the agentic-toolkit clone, not a project: run agentic-toolkit from your project, or use --global".into());
+        return Err(
+            "this is the afk clone, not a project: run afk from your project, or use --global"
+                .into(),
+        );
     }
     if real(&home()).is_some_and(|h| h == root) {
         return Err("the project would be your home directory, which is the global scope: use --global, or --project DIR".into());
@@ -99,14 +102,22 @@ pub fn project(project_arg: Option<&Path>, source: &Source) -> Result<PathBuf, S
     Ok(root)
 }
 
-/// Whether `root/.claude/settings.json` enables the agentic-toolkit plugin
-/// (`"agentic-toolkit@<marketplace>": true`).
+/// The plugin's name, then its name before the rename (ADR 0018).
+const PLUGIN_NAMES: [&str; 2] = ["afk", "agentic-toolkit"];
+
+/// Whether `root/.claude/settings.json` enables the afk plugin
+/// (`"afk@<marketplace>": true`, or the old `"agentic-toolkit@…"`).
 pub fn plugin_on(root: &Path) -> bool {
     let Ok(text) = fs::read_to_string(root.join(".claude").join("settings.json")) else {
         return false;
     };
-    let mut rest = text.as_str();
-    while let Some(at) = rest.find("\"agentic-toolkit@") {
+    PLUGIN_NAMES.iter().any(|n| enabled_in(&text, n))
+}
+
+fn enabled_in(text: &str, plugin: &str) -> bool {
+    let key = format!("\"{plugin}@");
+    let mut rest = text;
+    while let Some(at) = rest.find(&key) {
         let after = &rest[at + 1..];
         if let Some(end) = after.find('"') {
             let tail = after[end + 1..].trim_start();
@@ -170,16 +181,22 @@ mod tests {
         assert!(!plugin_on(tmp.path()));
         fs::write(
             settings.join("settings.json"),
-            r#"{"enabledPlugins": {"agentic-toolkit@agentic-toolkit" : true}}"#,
+            r#"{"enabledPlugins": {"afk@afk" : true}}"#,
         )
         .unwrap();
         assert!(plugin_on(tmp.path()));
         fs::write(
             settings.join("settings.json"),
-            r#"{"enabledPlugins": {"agentic-toolkit@agentic-toolkit": false}}"#,
+            r#"{"enabledPlugins": {"afk@afk": false}}"#,
         )
         .unwrap();
         assert!(!plugin_on(tmp.path()));
+        fs::write(
+            settings.join("settings.json"),
+            r#"{"enabledPlugins": {"afk@afk": false, "agentic-toolkit@agentic-toolkit": true}}"#,
+        )
+        .unwrap();
+        assert!(plugin_on(tmp.path()), "the name before the rename counts");
     }
 
     #[test]
