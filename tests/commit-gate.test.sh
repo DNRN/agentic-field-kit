@@ -199,6 +199,8 @@ hook_repo() {
   chmod +x "$REPO/.git/hooks/pre-commit"
 }
 commit() { # [git commit args...] -> commit's stderr; exit status is commit's
+  # stderr to the capture, stdout discarded: the order is deliberate.
+  # shellcheck disable=SC2069
   (cd "$REPO" && env -i PATH=/usr/bin:/bin HOME="$WORK" git commit -q "$@" 2>&1 >/dev/null)
 }
 expect_commit() { # $1=ok|denied $2=description, rest: git commit args
@@ -348,6 +350,8 @@ echo "# one gate at a time"
 install_copy() { mkdir -p "$REPO/.agents/hooks"; cp "$GATE" "$REPO/.agents/hooks/commit-gate.sh"; }
 # write_hook <path> <content>: an executable pre-commit hook.
 write_hook() { mkdir -p "$(dirname "$1")"; printf '%b' "$2" > "$1"; chmod +x "$1"; }
+# The shim's text, expanded by the hook at commit time, not here.
+# shellcheck disable=SC2016
 PRE_COMMIT_SHIM='#!/bin/sh\n# afk commit-gate\ngate="$(git rev-parse --show-toplevel)/.agents/hooks/commit-gate.sh"\n[ -f "$gate" ] || exit 0\nexec bash "$gate" --pre-commit\n'
 new_repo; stage code.py; install_copy
 expect deny "copy without a git hook: plugin still asks" "git commit -m x"

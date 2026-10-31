@@ -1,0 +1,3 @@
+# Links in text a skill writes into another project (such as the AGENTS.md
+# line in adr-planning): they resolve there, not in the skill's folder.
+/skills/[^/]+/docs/adr/?$
