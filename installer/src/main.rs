@@ -4,22 +4,22 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use agentic_toolkit::catalog::{Catalog, is_name};
-use agentic_toolkit::engine::{self, Action, Mode, Options, Plan};
-use agentic_toolkit::scope::{self, Scope, home};
-use agentic_toolkit::source::Source;
-use agentic_toolkit::status::Ctx;
-use agentic_toolkit::{agents, check, list, newproject, tui};
+use agentic_field_kit::catalog::{Catalog, is_name};
+use agentic_field_kit::engine::{self, Action, Mode, Options, Plan};
+use agentic_field_kit::scope::{self, Scope, home};
+use agentic_field_kit::source::Source;
+use agentic_field_kit::status::Ctx;
+use agentic_field_kit::{agents, check, list, newproject, tui};
 
-/// Install agentic-toolkit components into a project or globally.
+/// Install afk components into a project or globally.
 ///
 /// Scope: the git root of the working directory (default), --project DIR, or
 /// --global. Project installs are copies in .agents/skills, .claude/skills,
-/// and .claude/agents, recorded in .agents/agentic-toolkit.tsv; commit them.
+/// and .claude/agents, recorded in .agents/afk.tsv; commit them.
 /// Global installs are skills in ~/.agents/skills (--harness agents, claude,
 /// omp): copies, or with --source symlinks into that toolkit folder.
 #[derive(Parser, Debug)]
-#[command(name = "agentic-toolkit", version)]
+#[command(name = "afk", version)]
 struct Args {
     /// Components to install (or to update or remove)
     names: Vec<String>,
@@ -65,7 +65,7 @@ struct Args {
 }
 
 fn die(msg: &str) -> ExitCode {
-    eprintln!("agentic-toolkit: {msg}");
+    eprintln!("afk: {msg}");
     ExitCode::FAILURE
 }
 
@@ -102,8 +102,16 @@ fn run(
     names: &[String],
     all: bool,
 ) -> Result<bool, String> {
+    let mut renamed = Vec::new();
+    if action == Action::Update && !run.dry_run {
+        let root = ctx.scope_root(scope).expect("scope root");
+        renamed = engine::rename_legacy(scope, root).map_err(|e| e.to_string())?;
+        for line in &renamed {
+            println!("{line}");
+        }
+    }
     let plan: Plan = engine::plan_action(ctx, opts, action, scope, names, all)?;
-    if plan.steps.is_empty() {
+    if plan.steps.is_empty() && renamed.is_empty() {
         println!("Nothing to do.");
         return Ok(true);
     }
@@ -140,7 +148,7 @@ fn run(
         if action == Action::Install {
             ok &= warn_both_scopes(ctx, &plan, run);
         }
-        if (!applied.wrote.is_empty() || applied.changed)
+        if (!applied.wrote.is_empty() || applied.changed || !renamed.is_empty())
             && let Some(hint) = engine::commit_hint(ctx.root.as_deref().expect("project root"))
         {
             println!("{hint}");
@@ -184,12 +192,12 @@ fn warn_both_scopes(ctx: &Ctx, plan: &Plan, run: &Run) -> bool {
             ) {
                 Ok(done) => ok &= done,
                 Err(e) => {
-                    eprintln!("agentic-toolkit: {e}");
+                    eprintln!("afk: {e}");
                     ok = false;
                 }
             }
         } else {
-            println!("  Remove it with: agentic-toolkit --global --remove {s}");
+            println!("  Remove it with: afk --global --remove {s}");
         }
     }
     ok
@@ -364,7 +372,7 @@ fn main() -> ExitCode {
                 return match agents::launch(agent, &dir) {
                     Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
                     Err(e) => {
-                        eprintln!("agentic-toolkit: can't start {}: {e}", agent.command);
+                        eprintln!("afk: can't start {}: {e}", agent.command);
                         eprintln!(
                             "Next: open your agent in {shown} and ask it to start the project."
                         );

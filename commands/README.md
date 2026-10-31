@@ -1,6 +1,6 @@
 # Commands
 
-Slash commands, explicitly invoked by the user as `/agentic-toolkit:<name>`. None ship today: code review and doc sync are skills, which Claude Code already exposes as `/agentic-toolkit:code-review` and `/agentic-toolkit:doc-sync` ([ADR 0005](../docs/adr/0005-rubrics-live-in-skills.md)).
+Slash commands, explicitly invoked by the user as `/afk:<name>`. None ship today: code review and doc sync are skills, which Claude Code already exposes as `/afk:code-review` and `/afk:doc-sync` ([ADR 0005](../docs/adr/0005-rubrics-live-in-skills.md)).
 
 ## Format
 

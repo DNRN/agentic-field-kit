@@ -183,13 +183,13 @@ expect_no_reason "documentation (" "long-form pathspec magic counts as docs" "gi
 
 echo "# message names skills and stamp as installed"
 new_repo; stage code.py
-expect_reason "/agentic-toolkit:code-review" "plugin name without a project install" "git commit -m x"
+expect_reason "/afk:code-review" "plugin name without a project install" "git commit -m x"
 mkdir -p "$REPO/.agents/skills/code-review" "$REPO/.agents/skills/doc-sync" "$REPO/.agents/hooks"
 cp "$GATE" "$REPO/.agents/hooks/commit-gate.sh"
 expect_reason "run the code-review skill" "bare skill name with a project install" "git commit -m x"
 expect_reason "run the doc-sync skill" "bare doc-sync name with a project install" "git commit -m x"
 expect_reason "$REPO/.agents/hooks/commit-gate.sh --stamp-review" "stamp command uses the installed copy" "git commit -m x"
-expect_no_reason "/agentic-toolkit:" "no plugin names with a project install" "git commit -m x"
+expect_no_reason "/afk:" "no plugin names with a project install" "git commit -m x"
 
 echo "# --pre-commit (git hook mode)"
 # hook_repo: a fresh repo whose pre-commit hook runs the gate, as the shim does.
@@ -348,7 +348,7 @@ echo "# one gate at a time"
 install_copy() { mkdir -p "$REPO/.agents/hooks"; cp "$GATE" "$REPO/.agents/hooks/commit-gate.sh"; }
 # write_hook <path> <content>: an executable pre-commit hook.
 write_hook() { mkdir -p "$(dirname "$1")"; printf '%b' "$2" > "$1"; chmod +x "$1"; }
-PRE_COMMIT_SHIM='#!/bin/sh\n# agentic-toolkit commit-gate\ngate="$(git rev-parse --show-toplevel)/.agents/hooks/commit-gate.sh"\n[ -f "$gate" ] || exit 0\nexec bash "$gate" --pre-commit\n'
+PRE_COMMIT_SHIM='#!/bin/sh\n# afk commit-gate\ngate="$(git rev-parse --show-toplevel)/.agents/hooks/commit-gate.sh"\n[ -f "$gate" ] || exit 0\nexec bash "$gate" --pre-commit\n'
 new_repo; stage code.py; install_copy
 expect deny "copy without a git hook: plugin still asks" "git commit -m x"
 write_hook "$REPO/.git/hooks/pre-commit" "$PRE_COMMIT_SHIM"

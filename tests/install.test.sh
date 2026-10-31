@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Regression tests for the agentic-toolkit installer (docs/plans/rust-installer.md,
+# Regression tests for the afk installer (docs/plans/rust-installer.md,
 # docs/plans/selective-install.md), through its command line. It must never
 # replace or remove anything it did not install, must not delete local edits
 # without --force, and must keep installs consistent with their manifest so
-# that upgrading the binary + `agentic-toolkit --update` is the whole update.
+# that upgrading the binary + `afk --update` is the whole update.
 #
-# Uses $AGENTIC_TOOLKIT_BIN, or builds target/release/agentic-toolkit.
+# Uses $AFK_BIN, or builds target/release/afk.
 # shellcheck disable=SC2016 # holds evaluates its single-quoted conditions later
 set -u
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-BIN="${AGENTIC_TOOLKIT_BIN:-}"
+BIN="${AFK_BIN:-}"
 if [ -z "$BIN" ]; then
   (cd "$SRC" && cargo build --release --quiet) || { echo "install: cargo build failed"; exit 1; }
-  BIN="$SRC/target/release/agentic-toolkit"
+  BIN="$SRC/target/release/afk"
   [ -f "$BIN.exe" ] && BIN="$BIN.exe"
 fi
 
@@ -27,7 +27,7 @@ mkdir -p "$HOME"
 C="$TMP/toolkit"
 mkdir -p "$C"
 cp -R "$SRC/catalog.tsv" "$SRC/skills" "$SRC/agents" "$SRC/hooks" "$SRC/.claude-plugin" "$C/"
-I="$TMP/agentic-toolkit"
+I="$TMP/afk"
 printf '#!/usr/bin/env bash\nexec "%s" --source "%s" "$@"\n' "$BIN" "$C" > "$I"
 chmod +x "$I"
 
@@ -51,8 +51,8 @@ st() { # scope-column(project|global) name [installer args] → status from --li
   local col=$1 n=$2; shift 2
   "$I" --list "$@" | awk -v n="$n" -v c="$([ "$col" = project ] && echo 4 || echo 5)" '$2 == n { print $c }'
 }
-row() { cut -f2,5 "$1/.agents/agentic-toolkit.tsv" 2>/dev/null | grep -x "$2" >/dev/null; }
-in_manifest() { cut -f2 "$1/.agents/agentic-toolkit.tsv" 2>/dev/null | grep -qx "$2"; }
+row() { cut -f2,5 "$1/.agents/afk.tsv" 2>/dev/null | grep -x "$2" >/dev/null; }
+in_manifest() { cut -f2 "$1/.agents/afk.tsv" 2>/dev/null | grep -qx "$2"; }
 
 # ---- global scope ---------------------------------------------------------------
 G="$HOME/.claude/skills"
@@ -74,7 +74,7 @@ check "global remove: user's symlink survives" [ -L "$G/doc-sync" ]
 
 rm -rf "$G"
 "$I" --global --harness claude --mode copy --all >/dev/null
-check "global copy: recorded in ~/.agents/agentic-toolkit.tsv" in_manifest "$HOME" code-review
+check "global copy: recorded in ~/.agents/afk.tsv" in_manifest "$HOME" code-review
 check "global copy: listed as installed" [ "$(st global code-review --global)" = installed ]
 "$I" --global --harness claude --mode symlink --all >/dev/null
 check "global symlink: replaces its own copy" [ -L "$G/code-review" ]
@@ -83,7 +83,7 @@ check "global symlink: listed as linked" [ "$(st global code-review --global)" =
 check "global copy: replaces its own symlink" [ ! -L "$G/code-review" ]
 "$I" --global --harness claude --remove >/dev/null
 check "global remove: own installs removed" [ ! -e "$G/code-review" ]
-check "global remove: manifest emptied" [ ! -e "$HOME/.agents/agentic-toolkit.tsv" ]
+check "global remove: manifest emptied" [ ! -e "$HOME/.agents/afk.tsv" ]
 
 "$I" --global --all >/dev/null
 check "global default: into ~/.agents/skills, linked (copied on Windows)" default_form "$HOME/.agents/skills/code-review"
@@ -173,7 +173,7 @@ check "project: remove-all leaves someone else's file alone" [ -f "$P/.claude/ag
 
 P=$(project plugin)
 mkdir -p "$P/.claude"
-printf '{"enabledPlugins": {"agentic-toolkit@agentic-toolkit": true}}\n' > "$P/.claude/settings.json"
+printf '{"enabledPlugins": {"afk@afk": true}}\n' > "$P/.claude/settings.json"
 (cd "$P" && "$I" --all >/dev/null)
 check "plugin enabled for the project: skills only in .agents" holds '[ -d "$P/.agents/skills/code-review" ] && [ ! -e "$P/.claude/skills" ]'
 check "plugin enabled for the project: agents not copied" [ ! -e "$P/.claude/agents" ]
@@ -249,7 +249,7 @@ check "remove: keeps an edit even when the other copy was deleted" grep -q "loca
 P=$(project crlf-manifest)
 cd "$P" || exit 1
 "$I" code-review >/dev/null
-sed -i.bak 's/$/\r/' "$P/.agents/agentic-toolkit.tsv" && rm -f "$P/.agents/agentic-toolkit.tsv.bak"
+sed -i.bak 's/$/\r/' "$P/.agents/afk.tsv" && rm -f "$P/.agents/afk.tsv.bak"
 check "a CRLF manifest still reads as installed" [ "$(st project code-review)" = installed ]
 "$I" --update >/dev/null
 check "update with a CRLF manifest creates no stray folders" [ "$(ls "$P/.claude/skills")" = code-review ]
@@ -258,13 +258,13 @@ P=$(project hostile)
 cd "$P" || exit 1
 mkdir -p "$TMP/victim" && echo keep > "$TMP/victim/data.txt"
 "$I" code-review >/dev/null
-sed -i.bak "s|\.claude/skills/code-review\$|.claude/skills/code-review ../victim|" "$P/.agents/agentic-toolkit.tsv"
+sed -i.bak "s|\.claude/skills/code-review\$|.claude/skills/code-review ../victim|" "$P/.agents/afk.tsv"
 rm -rf "$P/.claude/skills/code-review"
 "$I" --update >/dev/null
 "$I" --remove --force --yes >/dev/null
 check "a manifest path outside the component's folders is never touched" [ "$(cat "$TMP/victim/data.txt")" = keep ]
 "$I" code-review >/dev/null
-sed -i.bak "s|\.agents/skills/code-review \.claude/skills/code-review\$|../x|" "$P/.agents/agentic-toolkit.tsv"
+sed -i.bak "s|\.agents/skills/code-review \.claude/skills/code-review\$|../x|" "$P/.agents/afk.tsv"
 check "a manifest row that claims no valid path claims nothing" [ "$(st project code-review)" = foreign ]
 
 P=$(project unavailable)
@@ -331,9 +331,9 @@ echo a > code.py; echo d > README.md; git add -A; git commit -qm init
 out="$("$I" commit-gate 2>&1)"
 check "hook: plan lists the copy and the shim" holds 'printf "%s" "$out" | grep -q "copy    .agents/hooks/commit-gate.sh" && printf "%s" "$out" | grep -q "hook    .git/hooks/pre-commit"'
 check "hook: copy is committed with the project" [ -f "$P/.agents/hooks/commit-gate.sh" ]
-check "hook: manifest records the copy only" holds 'grep -q "^hook${TAB}commit-gate${TAB}.*${TAB}\.agents/hooks/commit-gate\.sh\$" "$P/.agents/agentic-toolkit.tsv"'
+check "hook: manifest records the copy only" holds 'grep -q "^hook${TAB}commit-gate${TAB}.*${TAB}\.agents/hooks/commit-gate\.sh\$" "$P/.agents/afk.tsv"'
 check "hook: requirements come along" [ -d "$P/.agents/skills/code-review" ]
-check "hook: shim is executable and marked" holds '[ -x "$P/.git/hooks/pre-commit" ] && grep -qx "# agentic-toolkit commit-gate" "$P/.git/hooks/pre-commit"'
+check "hook: shim is executable and marked" holds '[ -x "$P/.git/hooks/pre-commit" ] && grep -qx "# afk commit-gate" "$P/.git/hooks/pre-commit"'
 check "hook: listed as installed" [ "$(st project commit-gate)" = installed ]
 git add -A; git commit -q --no-verify -m "add toolkit"
 echo b >> code.py; git add code.py

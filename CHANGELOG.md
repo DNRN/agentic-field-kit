@@ -1,8 +1,12 @@
 # Changelog
 
-Notable changes to agentic-toolkit. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and match `version` in `.claude-plugin/plugin.json`. Release steps: [README](README.md#releasing).
+Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and match `version` in `.claude-plugin/plugin.json`. Release steps: [README](README.md#releasing).
 
 ## [Unreleased]
+
+### Changed
+
+- Renamed to Agentic Field Kit, command `afk` ([ADR 0018](docs/adr/0018-rename-to-agentic-field-kit.md)). The installer binary is `afk` (package `agentic-field-kit`; the install scripts are `agentic-field-kit-installer.sh` and `.ps1`), the plugin and marketplace are `afk`, so skills are `/afk:<name>`, the manifest is `.agents/afk.tsv`, and the hook shim is marked `# afk commit-gate`. To upgrade: install the new release, remove `~/.cargo/bin/agentic-toolkit`, and run `afk --update` in each project, which moves `.agents/agentic-toolkit.tsv` to `.agents/afk.tsv` and rewrites the shim; commit the manifest. Plugin users: `/plugin install afk@afk`, then uninstall `agentic-toolkit@agentic-toolkit`. The installer still reads the old manifest, shim marker, and plugin name.
 
 ## [0.3.0] - 2026-10-30
 
@@ -66,7 +70,7 @@ First release.
 
 - `./install.sh` installs into `~/.agents/skills` only (Codex, Gemini CLI, OpenCode, Cursor, omp). A copy in `~/.claude/skills` hid the plugin's `agentic-toolkit:*` skills in Claude Code, so that target is now opt-in (`--harness claude`) for Claude Code without the plugin. `--remove` still clears every target.
 
-[Unreleased]: https://github.com/DNRN/agentic-toolkit/compare/agentic-toolkit--v0.3.0...HEAD
-[0.3.0]: https://github.com/DNRN/agentic-toolkit/compare/agentic-toolkit--v0.2.0...agentic-toolkit--v0.3.0
-[0.2.0]: https://github.com/DNRN/agentic-toolkit/compare/agentic-toolkit--v0.1.0...agentic-toolkit--v0.2.0
-[0.1.0]: https://github.com/DNRN/agentic-toolkit/releases/tag/agentic-toolkit--v0.1.0
+[Unreleased]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.3.0...HEAD
+[0.3.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.2.0...agentic-toolkit--v0.3.0
+[0.2.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.1.0...agentic-toolkit--v0.2.0
+[0.1.0]: https://github.com/DNRN/agentic-field-kit/releases/tag/agentic-toolkit--v0.1.0

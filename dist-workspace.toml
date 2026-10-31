@@ -20,7 +20,7 @@ install-updater = false
 # Build every artifact on pull requests too, without publishing, so a broken
 # target shows before a release tag.
 pr-run-mode = "upload"
-# Plugin releases are tagged agentic-toolkit--vX.Y.Z by `claude plugin tag`,
+# Plugin releases are tagged afk--vX.Y.Z by `claude plugin tag`,
 # which dist can't parse; installer releases get their own tag, which also
 # keeps the plugin tag from starting this workflow.
 tag-namespace = "installer"

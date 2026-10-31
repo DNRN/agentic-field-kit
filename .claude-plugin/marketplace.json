@@ -1,12 +1,12 @@
 {
-  "name": "agentic-toolkit",
-  "description": "Personal collection of agent components shared across projects: skills, agents, commands, hooks, styles, rules, and templates",
+  "name": "afk",
+  "description": "Agentic Field Kit (afk): personal collection of agent components shared across projects: skills, agents, commands, hooks, styles, rules, and templates",
   "owner": {
     "name": "DNRN"
   },
   "plugins": [
     {
-      "name": "agentic-toolkit",
+      "name": "afk",
       "source": ".",
       "description": "Shared agents, skills, commands, hooks, output styles, rules, and templates for coding agents"
     }

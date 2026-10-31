@@ -23,16 +23,16 @@ The pattern underneath: agentic coding makes writing cheap and review the bottle
 
 ## Using it
 
-**What loads where.** The skill and its rubric work in every harness (the `agentic-toolkit` installer puts them where each harness reads skills; see the README's [Install](../README.md#install)); where a harness has subagents but not this toolkit's agents, any read-only subagent given the rubric does the same job. The bundled subagent loads via the Claude Code plugin, or `agentic-toolkit code-reviewer` copies it into a project for Claude Code; the commit gate runs as a git `pre-commit` hook in every harness after `agentic-toolkit commit-gate` ([ADR 0013](adr/0013-commit-gate-as-git-hook.md)), or as a Claude Code hook via the plugin:
+**What loads where.** The skill and its rubric work in every harness (the `afk` installer puts them where each harness reads skills; see the README's [Install](../README.md#install)); where a harness has subagents but not this toolkit's agents, any read-only subagent given the rubric does the same job. The bundled subagent loads via the Claude Code plugin, or `afk code-reviewer` copies it into a project for Claude Code; the commit gate runs as a git `pre-commit` hook in every harness after `afk commit-gate` ([ADR 0013](adr/0013-commit-gate-as-git-hook.md)), or as a Claude Code hook via the plugin:
 
 ```
-/plugin marketplace add DNRN/agentic-toolkit
-/plugin install agentic-toolkit@agentic-toolkit
+/plugin marketplace add DNRN/agentic-field-kit
+/plugin install afk@afk
 ```
 
 **Three ways a review starts:**
 
-1. You ask: invoke the skill (`/agentic-toolkit:code-review` in Claude Code, your harness's skill invocation elsewhere), optionally with a target: `staged`, `worktree`, a branch, a ref range; defaults to the staged diff.
+1. You ask: invoke the skill (`/afk:code-review` in Claude Code, your harness's skill invocation elsewhere), optionally with a target: `staged`, `worktree`, a branch, a ref range; defaults to the staged diff.
 2. The agent offers: per the skill, before committing completed work it proposes a review first.
 3. The gate asks: an unreviewed `git commit` is denied with instructions for the agent to ask you.
 4. You ship: "ship it" runs the `ship` skill, which reviews, checks the docs, writes the message, and commits.

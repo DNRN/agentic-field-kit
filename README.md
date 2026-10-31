@@ -1,4 +1,6 @@
-# agentic-toolkit
+# Agentic Field Kit (afk)
+
+*Go AFK. Your agents won't cut corners.*
 
 Harness-agnostic collection of agent components: skills, subagents, commands, hooks, output styles, plus copy-paste rules, prompt templates, and permission policies. Works across projects and tools.
 
@@ -16,10 +18,10 @@ The rules don't depend on the model remembering them: a git hook asks before an 
 | `project-init` | skill | Starts a project: git, a remote if you have one, `AGENTS.md`, `CLAUDE.md`, and `PROJECT.md` from a short dialogue | Every harness |
 | `ship` | skill | On "ship it": review, docs, commit message, commit | Every harness |
 | `code-reviewer` · `doc-auditor` | agent | Read-only subagents with fresh context for the two skills above | Claude Code |
-| `commit-gate` | hook | Asks before unreviewed commits and code changes without docs; denies edits to Accepted ADRs | Every harness as a git `pre-commit` hook (`agentic-toolkit commit-gate`); Claude Code also via the plugin |
+| `commit-gate` | hook | Asks before unreviewed commits and code changes without docs; denies edits to Accepted ADRs | Every harness as a git `pre-commit` hook (`afk commit-gate`); Claude Code also via the plugin |
 | `adr-index` | hook | Lists the Accepted ADRs at the start of each session | Claude Code, via the plugin |
 
-`agentic-toolkit --list` shows the same list with what is installed where.
+`afk --list` shows the same list with what is installed where.
 
 ## Compatibility
 
@@ -34,37 +36,37 @@ Skills follow the [Agent Skills](https://agentskills.io) open standard — ident
 
 ## Install
 
-Install only the components you need, into the project that needs them. The `agentic-toolkit` installer copies them into the repository; commit them, and every teammate and every harness gets the same version. It is one binary with the components built in: no clone, git, or runtime needed.
+Install only the components you need, into the project that needs them. The `afk` installer copies them into the repository; commit them, and every teammate and every harness gets the same version. It is one binary with the components built in: no clone, git, or runtime needed.
 
 ```bash
 # macOS, Linux
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/DNRN/agentic-toolkit/releases/latest/download/agentic-toolkit-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/DNRN/agentic-field-kit/releases/latest/download/agentic-field-kit-installer.sh | sh
 ```
 
 ```powershell
 # Windows
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/DNRN/agentic-toolkit/releases/latest/download/agentic-toolkit-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/DNRN/agentic-field-kit/releases/latest/download/agentic-field-kit-installer.ps1 | iex"
 ```
 
-Both put `agentic-toolkit` in `~/.cargo/bin`; the [release page](https://github.com/DNRN/agentic-toolkit/releases/latest) has the archives and checksums. With Rust: `cargo install --locked --git https://github.com/DNRN/agentic-toolkit agentic-toolkit`.
+Both put `afk` in `~/.cargo/bin`; the [release page](https://github.com/DNRN/agentic-field-kit/releases/latest) has the archives and checksums. With Rust: `cargo install --locked --git https://github.com/DNRN/agentic-field-kit agentic-field-kit`.
 
 ```bash
 cd ~/code/your-project
-agentic-toolkit                  # the menu: what can be installed, what is installed
-agentic-toolkit code-reviewer    # or name components; what they require comes along
-git add .agents .claude && git commit -m "Add agentic-toolkit components"
+afk                  # the menu: what can be installed, what is installed
+afk code-reviewer    # or name components; what they require comes along
+git add .agents .claude && git commit -m "Add afk components"
 ```
 
 | Command | Effect |
 | --- | --- |
-| `agentic-toolkit` | The menu (on a terminal): space or a number marks a component to install or remove, `u` marks updates, `g` switches to the global scope, Enter shows the plan, `y` applies it |
-| `agentic-toolkit --list` | Status of every component, in this project and globally |
-| `agentic-toolkit NAME…` · `--all` | Install components and what they require |
-| `agentic-toolkit --update [NAME…]` | After upgrading the installer: refresh what changed, restore deleted copies, add new requirements |
-| `agentic-toolkit --remove [NAME…]` | Remove what the installer installed, and requirements nothing else needs |
+| `afk` | The menu (on a terminal): space or a number marks a component to install or remove, `u` marks updates, `g` switches to the global scope, Enter shows the plan, `y` applies it |
+| `afk --list` | Status of every component, in this project and globally |
+| `afk NAME…` · `--all` | Install components and what they require |
+| `afk --update [NAME…]` | After upgrading the installer: refresh what changed, restore deleted copies, add new requirements |
+| `afk --remove [NAME…]` | Remove what the installer installed, and requirements nothing else needs |
 | `--project DIR` · `--global` | Scope: the git root of the working directory by default |
 | `--force` · `--dry-run` · `--yes` | Also overwrite or remove locally edited copies · print the plan only · don't ask |
-| `agentic-toolkit --check` | Validate skills against the Agent Skills portability rules |
+| `afk --check` | Validate skills against the Agent Skills portability rules |
 | `--source DIR` | Use a toolkit working tree instead of the built-in components (contributors) |
 
 Where a project install puts things ([ADR 0006](docs/adr/0006-project-scope-install-default.md)):
@@ -75,19 +77,19 @@ Where a project install puts things ([ADR 0006](docs/adr/0006-project-scope-inst
 | `.claude/skills/<name>/` | Claude Code. Left out when the project's `.claude/settings.json` enables the plugin, which already provides the skills |
 | `.claude/agents/<name>.md` | Claude Code subagents; same condition |
 | `.agents/hooks/<name>.sh` | Git, through the clone's `pre-commit` hook: the commit gate, in every harness and in a terminal ([ADR 0014](docs/adr/0014-git-hook-layout.md)) |
-| `.agents/agentic-toolkit.tsv` | The installer: what it installed, why, and a content hash of each ([ADR 0008](docs/adr/0008-project-install-manifest.md)) |
+| `.agents/afk.tsv` | The installer: what it installed, why, and a content hash of each ([ADR 0008](docs/adr/0008-project-install-manifest.md)) |
 
-**Updating.** Install the new release the same way, then run `agentic-toolkit --update` in each project ([ADR 0010](docs/adr/0010-components-embedded-in-binary.md)). Components have no version numbers of their own. `--list` compares each copy with the hash recorded at install time and with the installer's: `outdated` (changed in the new release), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it), `inactive` (a hook whose copy is current but that git doesn't run in this clone yet). The installer never touches a file it didn't install (`foreign`).
+**Updating.** Install the new release the same way, then run `afk --update` in each project ([ADR 0010](docs/adr/0010-components-embedded-in-binary.md)). Components have no version numbers of their own. `--list` compares each copy with the hash recorded at install time and with the installer's: `outdated` (changed in the new release), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it), `inactive` (a hook whose copy is current but that git doesn't run in this clone yet). The installer never touches a file it didn't install (`foreign`).
 
 Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#evidence)):
 
 - Gemini CLI loads project skills only in a [trusted folder](https://geminicli.com/docs/cli/trusted-folders/). Gemini CLI and Cursor find them only when started at the repository root.
 - A skill installed both in the project and globally: Codex lists it twice, Claude Code and Cursor use the global copy. `--list` flags it, and a project install offers to remove the global copy.
-- With the plugin enabled at user scope, Claude Code lists a project `code-review` next to the plugin's `agentic-toolkit:code-review`. Enable the plugin for the project instead, or install only the plugin.
+- With the plugin enabled at user scope, Claude Code lists a project `code-review` next to the plugin's `afk:code-review`. Enable the plugin for the project instead, or install only the plugin.
 
 ### The commit gate
 
-`agentic-toolkit commit-gate` copies the gate to `.agents/hooks/commit-gate.sh` (commit it) and writes a small `pre-commit` hook in this clone that runs it, where git looks for hooks (`core.hooksPath` counts) ([ADR 0013](docs/adr/0013-commit-gate-as-git-hook.md), [ADR 0014](docs/adr/0014-git-hook-layout.md)). From then on a commit from any harness or terminal is stopped with a `commit-gate:` message when:
+`afk commit-gate` copies the gate to `.agents/hooks/commit-gate.sh` (commit it) and writes a small `pre-commit` hook in this clone that runs it, where git looks for hooks (`core.hooksPath` counts) ([ADR 0013](docs/adr/0013-commit-gate-as-git-hook.md), [ADR 0014](docs/adr/0014-git-hook-layout.md)). From then on a commit from any harness or terminal is stopped with a `commit-gate:` message when:
 
 - the staged changes haven't been reviewed: the agent asks you, runs `code-review`, and stamps the reviewed diff;
 - code changed and no doc did: the agent runs `doc-sync` and stamps it (which paths count as docs: [`hooks/README.md`](hooks/README.md#commit-gatesh));
@@ -95,7 +97,7 @@ Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#e
 
 `git commit --no-verify` skips the gate; that is how you decline a check. `ship` runs the whole flow on request.
 
-- `.git/` isn't committed, so each teammate runs `agentic-toolkit --update` once after cloning; until then `--list` says `inactive`.
+- `.git/` isn't committed, so each teammate runs `afk --update` once after cloning; until then `--list` says `inactive`.
 - A `pre-commit` hook the installer didn't write (husky, the pre-commit framework, your own) is never changed. Add this line to it instead; it does nothing once the gate is removed:
 
   ```sh
@@ -106,7 +108,7 @@ Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#e
 
 ### Start a new project
 
-Run `agentic-toolkit` in the folder where the project should be. Outside a git repository it opens a new project screen ([ADR 0016](docs/adr/0016-new-project-screen.md)): it shows the folder you are in and what is there, and asks whether to start the project here, in a new folder inside it, or to browse components instead. Your home folder is never made a project; you name a new folder inside it.
+Run `afk` in the folder where the project should be. Outside a git repository it opens a new project screen ([ADR 0016](docs/adr/0016-new-project-screen.md)): it shows the folder you are in and what is there, and asks whether to start the project here, in a new folder inside it, or to browse components instead. Your home folder is never made a project; you name a new folder inside it.
 
 Starting a project is the `project-init` skill's job, and it runs in your agent: it sets up git (and a remote, if you have one), writes `AGENTS.md`, a `CLAUDE.md` that imports it, and `PROJECT.md` from a few questions you can skip. So the installer installs `project-init` into the folder you picked, then starts your agent there with "Start a new project in this folder with the project-init skill." ([ADR 0017](docs/adr/0017-hand-off-to-the-agent.md)). It starts Claude Code (`claude`) and omp (`omp`) when they are on your `PATH`, and asks which when both are; for other agents it prints the step to take yourself.
 
@@ -114,24 +116,24 @@ Without the menu, the same in two commands:
 
 ```bash
 mkdir my-project && cd my-project
-agentic-toolkit --project . project-init     # or once for every folder: --global project-init
+afk --project . project-init     # or once for every folder: --global project-init
 ```
 
-then open your agent in the folder and ask it to start the project. With the Claude Code plugin, the skill is already there as `/agentic-toolkit:project-init`. Afterwards, install the rest from the new repository as usual, such as `agentic-toolkit commit-gate`.
+then open your agent in the folder and ask it to start the project. With the Claude Code plugin, the skill is already there as `/afk:project-init`. Afterwards, install the rest from the new repository as usual, such as `afk commit-gate`.
 
 ### Global install
 
-For a skill you want in every repository, such as `adr-planning`, or one you use before a repository exists, such as `project-init`: `agentic-toolkit --global NAME`. Global installs are copies. With `--source DIR` they are symlinks into that toolkit folder instead, except on Windows, where copies stay the default (`--mode symlink` needs Developer Mode); `--mode` picks either, and `--update` keeps each install's form.
+For a skill you want in every repository, such as `adr-planning`, or one you use before a repository exists, such as `project-init`: `afk --global NAME`. Global installs are copies. With `--source DIR` they are symlinks into that toolkit folder instead, except on Windows, where copies stay the default (`--mode symlink` needs Developer Mode); `--mode` picks either, and `--update` keeps each install's form.
 
 | `--harness` | Target | Read by |
 | --- | --- | --- |
 | `agents` (default) | `~/.agents/skills/` | Codex, Gemini CLI, OpenCode, Cursor, omp |
-| `claude` | `~/.claude/skills/` | Claude Code; also OpenCode, and Cursor with third-party extensibility on. Only without the plugin: a personal symlink to the plugin's skill folder hides the plugin's `agentic-toolkit:*` name, which the commit gate tells the agent to run, and a personal copy lists every skill twice |
+| `claude` | `~/.claude/skills/` | Claude Code; also OpenCode, and Cursor with third-party extensibility on. Only without the plugin: a personal symlink to the plugin's skill folder hides the plugin's `afk:*` name, which the commit gate tells the agent to run, and a personal copy lists every skill twice |
 | `omp` | `~/.omp/agent/skills/` | omp; needed only when its `~/.agents` provider is turned off |
 
-- Codex names a *symlinked* skill `agentic-toolkit:<name>`, because its real path sits inside this plugin repo. Copies keep the bare name.
+- Codex names a *symlinked* skill `afk:<name>`, because its real path sits inside this plugin repo. Copies keep the bare name.
 - In Claude Code, a personal `code-review` replaces the built-in `/code-review`.
-- `agentic-toolkit --global --remove` also removes the links and copies made by the 0.1.0 installer (`install.sh`).
+- `afk --global --remove` also removes the links and copies made by the 0.1.0 installer (`install.sh`).
 
 ### Windows
 
@@ -140,8 +142,8 @@ The installer is a native Windows program; it needs no Git Bash or WSL. Project 
 ## Claude Code full bundle (also loads agents, commands, hooks, styles)
 
 ```
-/plugin marketplace add DNRN/agentic-toolkit
-/plugin install agentic-toolkit@agentic-toolkit
+/plugin marketplace add DNRN/agentic-field-kit
+/plugin install afk@afk
 ```
 
 `.claude-plugin/` is an optional adapter, not the repo's identity — everything in `skills/` is plain standard folders usable without it.
@@ -161,7 +163,7 @@ The installer is a native Windows program; it needs no Git Bash or WSL. Project 
 | [`policies/`](policies/) | Permission allow/deny presets | Copy into project settings |
 | [`evals/`](evals/) | Golden tasks per component in `claude plugin eval` format, scored against a no-plugin baseline | [`claude plugin eval .`](evals/README.md#run) |
 | [`tests/`](tests/) | Deterministic regression tests for hooks, the installer, `catalog.tsv`, and release metadata | `tests/run.sh` |
-| [`installer/`](installer/) | The Rust installer `agentic-toolkit`: command line and terminal UI, with the components built in ([plan](docs/plans/rust-installer.md)) | `cargo build --release` |
+| [`installer/`](installer/) | The Rust installer `afk`: command line and terminal UI, with the components built in ([plan](docs/plans/rust-installer.md)) | `cargo build --release` |
 | `catalog.tsv` | Every installable component: kind, path, harnesses, requirements, one-line summary ([ADR 0007](docs/adr/0007-component-catalog.md)) | Read by the installer |
 | [`assets/brand/`](assets/brand/) | The Entropy Fox name and logo the installer shows; not MIT ([ADR 0011](docs/adr/0011-brand-assets-not-mit.md)) | Built into the installer |
 | [`docs/`](docs/) | Rationale essays, [ADRs](docs/adr/), [plans](docs/plans/) | Read |
@@ -183,7 +185,7 @@ Users of the plugin get a new release only when `version` in `.claude-plugin/plu
 1. Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a new `## [X.Y.Z] - YYYY-MM-DD` heading and add its compare link at the bottom.
 2. Set the same `X.Y.Z` in `.claude-plugin/plugin.json` and `installer/Cargo.toml`, then run `cargo build` to update `Cargo.lock` (semver: minor for new components or behavior, patch for fixes; a breaking rename or removal is a major once past 1.0).
 3. `tests/run.sh` (fails if the versions differ or have no dated changelog entry), then commit and merge to `main`.
-4. `claude plugin tag --push` creates and pushes `agentic-toolkit--vX.Y.Z` (the plugin) after checking that `plugin.json` and the marketplace entry agree.
+4. `claude plugin tag --push` creates and pushes `afk--vX.Y.Z` (the plugin) after checking that `plugin.json` and the marketplace entry agree.
 5. `git tag installer/vX.Y.Z && git push origin installer/vX.Y.Z` starts [`installer-release.yml`](.github/workflows/installer-release.yml), which builds the installer for every platform and publishes the GitHub release with its install scripts. dist can't read the plugin's tag, so the installer has its own.
 
 ## Contributing

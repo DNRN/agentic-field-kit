@@ -156,7 +156,7 @@ skill_ref() {
   if [ -d "$1/.agents/skills/$2" ]; then
     printf 'the %s skill' "$2"
   else
-    printf '/agentic-toolkit:%s' "$2"
+    printf '/afk:%s' "$2"
   fi
 }
 
