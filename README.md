@@ -15,7 +15,7 @@ The rules don't depend on the model remembering them: a git hook asks before an 
 | `adr-planning` | skill | Records design decisions as ADRs while planning, on request, or to supersede an Accepted one; briefs you and records your verdict | Every harness |
 | `code-review` | skill | Fresh-eyes review of a diff before commit, with severity-ranked findings and a verdict | Every harness |
 | `doc-sync` | skill | Keeps docs true to the code in the same commit | Every harness |
-| `project-init` | skill | Starts a project: git, a remote if you have one, `AGENTS.md`, `CLAUDE.md`, and `PROJECT.md` from a short dialogue | Every harness |
+| `project-init` | skill | Starts a project: asks for a title and a description, then sets up git and a remote if you have one, and writes `PROJECT.md`, `AGENTS.md`, and `CLAUDE.md` | Every harness |
 | `ship` | skill | On "ship it": review, docs, commit message, commit | Every harness |
 | `code-reviewer` · `doc-auditor` | agent | Read-only subagents with fresh context for the two skills above | Claude Code |
 | `commit-gate` | hook | Asks before unreviewed commits and code changes without docs; denies edits to Accepted ADRs | Every harness as a git `pre-commit` hook (`afk commit-gate`); Claude Code also via the plugin |
@@ -110,7 +110,7 @@ Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#e
 
 Run `afk` in the folder where the project should be. Outside a git repository it opens a new project screen ([ADR 0016](docs/adr/0016-new-project-screen.md)): it shows the folder you are in and what is there, and asks whether to start the project here, in a new folder inside it, or to browse components instead. Your home folder is never made a project; you name a new folder inside it.
 
-Starting a project is the `project-init` skill's job, and it runs in your agent: it sets up git (and a remote, if you have one), writes `AGENTS.md`, a `CLAUDE.md` that imports it, and `PROJECT.md` from a few questions you can skip. So the installer installs `project-init` into the folder you picked, then starts your agent there with "Start a new project in this folder with the project-init skill." ([ADR 0017](docs/adr/0017-hand-off-to-the-agent.md)). It starts Claude Code (`claude`) and omp (`omp`) when they are on your `PATH`, and asks which when both are; for other agents it prints the step to take yourself.
+Starting a project is the `project-init` skill's job, and it runs in your agent: it asks for the project's title (suggesting the folder name) and a description in your words, offers a few more questions you can skip, then sets up git (and a remote, if you have one) and writes `PROJECT.md`, `AGENTS.md`, and a `CLAUDE.md` that imports it. So the installer installs `project-init` into the folder you picked, then starts your agent there with "Start a new project in this folder with the project-init skill." ([ADR 0017](docs/adr/0017-hand-off-to-the-agent.md)). It starts Claude Code (`claude`) and omp (`omp`) when they are on your `PATH`, and asks which when both are; for other agents it prints the step to take yourself.
 
 Without the menu, the same in two commands:
 
