@@ -43,48 +43,11 @@ pub fn file(root: &Path) -> PathBuf {
     root.join(".agents").join("afk.tsv")
 }
 
-/// The manifest's name before the rename (ADR 0018): read while `file` is
-/// missing, and removed by the next write.
-fn legacy_file(root: &Path) -> PathBuf {
-    root.join(".agents").join("agentic-toolkit.tsv")
-}
-
-/// The manifest to read: `file`, or the legacy one when only that exists.
-fn existing(root: &Path) -> PathBuf {
-    let new = file(root);
-    let old = legacy_file(root);
-    if !new.exists() && old.exists() {
-        old
-    } else {
-        new
-    }
-}
-
-/// Renames the legacy manifest to `file` when only the legacy one exists.
-/// Whether it did.
-pub fn move_legacy(root: &Path) -> io::Result<bool> {
-    let (old, new) = (legacy_file(root), file(root));
-    if new.exists() || !old.exists() {
-        return Ok(false);
-    }
-    fs::rename(&old, &new)
-        .map_err(|e| io::Error::new(e.kind(), format!("{}: {e}", old.display())))?;
-    Ok(true)
-}
-
-/// Removes the legacy manifest, if any.
-fn drop_legacy(root: &Path) -> io::Result<()> {
-    match fs::remove_file(legacy_file(root)) {
-        Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
-        _ => Ok(()),
-    }
-}
-
 /// The manifest's non-empty lines as bytes, without `\n` or a trailing `\r`.
 /// Bytes, not text: every row survives a rewrite even
 /// when they aren't UTF-8. A missing manifest has no lines.
 fn raw_lines(root: &Path) -> io::Result<Vec<Vec<u8>>> {
-    let path = existing(root);
+    let path = file(root);
     match fs::read(&path) {
         Ok(bytes) => Ok(bytes
             .split(|&b| b == b'\n')
@@ -155,8 +118,7 @@ fn write_lines(root: &Path, lines: &[Vec<u8>]) -> io::Result<()> {
     let tmp = path.with_extension("tsv.tmp");
     let named = |e: io::Error| io::Error::new(e.kind(), format!("{}: {e}", path.display()));
     fs::write(&tmp, bytes).map_err(named)?;
-    fs::rename(&tmp, &path).map_err(named)?;
-    drop_legacy(root)
+    fs::rename(&tmp, &path).map_err(named)
 }
 
 /// Replaces `name`'s row. Rows stay sorted by name (`LC_ALL=C sort -t TAB -k2,2`).
@@ -183,15 +145,12 @@ pub fn put(
 
 /// Removes `name`'s row; deletes the manifest when no row is left.
 pub fn drop(root: &Path, name: &str) -> io::Result<()> {
-    if !existing(root).exists() {
+    if !file(root).exists() {
         return Ok(());
     }
     let lines = other_lines(root, name)?;
     if lines.is_empty() {
-        if file(root).exists() {
-            fs::remove_file(file(root))?;
-        }
-        return drop_legacy(root);
+        return fs::remove_file(file(root));
     }
     write_lines(root, &lines)
 }
@@ -295,50 +254,6 @@ mod write_tests {
         drop(root, "doc-sync").unwrap();
         drop(root, "adr-planning").unwrap();
         assert!(!file(root).exists(), "an empty manifest is deleted");
-    }
-
-    #[test]
-    fn the_legacy_manifest_is_read_then_moved() {
-        let tmp = tempfile::tempdir().unwrap();
-        let root = tmp.path();
-        fs::create_dir_all(root.join(".agents")).unwrap();
-        fs::write(
-            legacy_file(root),
-            "kind\tname\tversion\thash\treason\tpaths\n\
-             skill\tdoc-sync\t0.3.0\th1\texplicit\t.agents/skills/doc-sync\n",
-        )
-        .unwrap();
-        assert!(
-            row(root, "doc-sync").is_some(),
-            "read while afk.tsv is missing"
-        );
-        put(
-            root,
-            "skill",
-            "adr-planning",
-            "0.4.0",
-            "h2",
-            "explicit",
-            &[".agents/skills/adr-planning".into()],
-        )
-        .unwrap();
-        assert!(!legacy_file(root).exists(), "the write moves it");
-        assert!(row(root, "doc-sync").is_some() && row(root, "adr-planning").is_some());
-    }
-
-    #[test]
-    fn dropping_the_last_legacy_row_deletes_it() {
-        let tmp = tempfile::tempdir().unwrap();
-        let root = tmp.path();
-        fs::create_dir_all(root.join(".agents")).unwrap();
-        fs::write(
-            legacy_file(root),
-            "kind\tname\tversion\thash\treason\tpaths\n\
-             skill\tdoc-sync\t0.3.0\th1\texplicit\t.agents/skills/doc-sync\n",
-        )
-        .unwrap();
-        drop(root, "doc-sync").unwrap();
-        assert!(!legacy_file(root).exists() && !file(root).exists());
     }
 }
 

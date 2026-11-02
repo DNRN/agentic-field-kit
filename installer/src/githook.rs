@@ -18,21 +18,6 @@ pub fn marker(name: &str) -> String {
     format!("# afk {name}")
 }
 
-/// The marker shims had before the rename (ADR 0018). Still ours, so
-/// `--update` rewrites them and `--remove` deletes them.
-fn legacy_marker(name: &str) -> String {
-    format!("# agentic-toolkit {name}")
-}
-
-/// git's `pre-commit` hook when it is a shim with the legacy marker.
-pub fn legacy_shim(root: &Path, name: &str) -> Option<PathBuf> {
-    let path = pre_commit_path(root)?;
-    let text = fs::read_to_string(&path).ok()?;
-    text.lines()
-        .any(|l| l.trim_end() == legacy_marker(name))
-        .then_some(path)
-}
-
 /// The line to add to a `pre-commit` hook the installer doesn't own. Git runs
 /// hooks at the top of the worktree; the line fails open without the copy.
 pub fn line_to_add(name: &str) -> String {
@@ -115,8 +100,7 @@ pub fn state(root: &Path, name: &str) -> State {
         };
     };
     let text = String::from_utf8_lossy(&bytes);
-    let ours = [marker(name), legacy_marker(name)];
-    if text.lines().any(|l| ours.iter().any(|m| l.trim_end() == m)) {
+    if text.lines().any(|l| l.trim_end() == marker(name)) {
         State::Ours(path)
     } else if text.contains(&copy_path(name)[1..]) {
         // `agents/hooks/<name>.sh`, as the plugin gate detects it.
@@ -198,19 +182,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(state(root, "commit-gate"), State::Runs(hook));
-    }
-
-    #[test]
-    fn a_shim_from_before_the_rename_is_ours() {
-        let tmp = repo();
-        let root = tmp.path();
-        let hook = pre_commit_path(root).unwrap();
-        fs::write(
-            &hook,
-            shim("commit-gate").replace("# afk ", "# agentic-toolkit "),
-        )
-        .unwrap();
-        assert_eq!(state(root, "commit-gate"), State::Ours(hook));
     }
 
     #[test]
