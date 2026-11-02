@@ -55,13 +55,13 @@ fn git_root(dir: &Path) -> Option<PathBuf> {
 }
 
 /// A folder that looks like an afk tree: a catalog and a plugin
-/// manifest named afk, or agentic-toolkit before the rename (ADR 0018).
+/// manifest named afk.
 pub fn is_toolkit_tree(dir: &Path) -> bool {
     dir.join("catalog.tsv").is_file()
         && fs::read_to_string(dir.join(".claude-plugin/plugin.json"))
             .ok()
             .and_then(|t| json_string_field(&t, "name"))
-            .is_some_and(|n| PLUGIN_NAMES.contains(&n.as_str()))
+            .is_some_and(|n| n == "afk")
 }
 
 /// The start of the reason there is no project when the working directory is
@@ -102,16 +102,13 @@ pub fn project(project_arg: Option<&Path>, source: &Source) -> Result<PathBuf, S
     Ok(root)
 }
 
-/// The plugin's name, then its name before the rename (ADR 0018).
-const PLUGIN_NAMES: [&str; 2] = ["afk", "agentic-toolkit"];
-
 /// Whether `root/.claude/settings.json` enables the afk plugin
-/// (`"afk@<marketplace>": true`, or the old `"agentic-toolkit@…"`).
+/// (`"afk@<marketplace>": true`).
 pub fn plugin_on(root: &Path) -> bool {
     let Ok(text) = fs::read_to_string(root.join(".claude").join("settings.json")) else {
         return false;
     };
-    PLUGIN_NAMES.iter().any(|n| enabled_in(&text, n))
+    enabled_in(&text, "afk")
 }
 
 fn enabled_in(text: &str, plugin: &str) -> bool {
@@ -191,12 +188,6 @@ mod tests {
         )
         .unwrap();
         assert!(!plugin_on(tmp.path()));
-        fs::write(
-            settings.join("settings.json"),
-            r#"{"enabledPlugins": {"afk@afk": false, "agentic-toolkit@agentic-toolkit": true}}"#,
-        )
-        .unwrap();
-        assert!(plugin_on(tmp.path()), "the name before the rename counts");
     }
 
     #[test]

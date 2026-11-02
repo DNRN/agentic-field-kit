@@ -4,7 +4,7 @@ Date: 2026-10-31
 
 ## Status
 
-Accepted
+Accepted. The compatibility reads (the fourth and fifth bullets of the decision) are dropped before release by [0019](0019-drop-agentic-toolkit-compatibility.md).
 
 Related: [ADR 0008](0008-project-install-manifest.md) (the manifest), [ADR 0009](0009-installer-in-rust.md) (the installer), [ADR 0014](0014-git-hook-layout.md) (the hook shim).
 

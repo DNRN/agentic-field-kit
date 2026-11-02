@@ -872,33 +872,6 @@ fn enable_hook(root: &Path, name: &str, done: &mut Applied) -> io::Result<()> {
     Ok(())
 }
 
-/// Moves what was written under the name before the rename (ADR 0018) to the
-/// new one: the manifest, and in a project each hook's shim. The lines to print.
-pub fn rename_legacy(scope: Scope, root: &Path) -> io::Result<Vec<String>> {
-    let mut out = Vec::new();
-    if manifest::move_legacy(root)? {
-        out.push(format!(
-            "  {:<7} .agents/agentic-toolkit.tsv → .agents/afk.tsv",
-            "rename"
-        ));
-    }
-    if scope == Scope::Project {
-        for row in manifest::rows(root) {
-            if row.kind == "hook"
-                && let Some(p) = githook::legacy_shim(root, &row.name)
-            {
-                githook::write_shim(&p, &row.name).map_err(|e| with_path(&p, e))?;
-                out.push(format!(
-                    "  {:<7} {}  (renamed marker)",
-                    "hook",
-                    githook::disp(root, &p)
-                ));
-            }
-        }
-    }
-    Ok(out)
-}
-
 /// Carries out the plan. `can_ask_remove` as for [`show`].
 pub fn apply(
     ctx: &Ctx,
@@ -1152,30 +1125,6 @@ mod tests {
         assert_eq!(row.paths(), [".agents/hooks/commit-gate.sh"]);
         assert_eq!(ctx.status(Scope::Project, "commit-gate"), "installed");
         assert_eq!(ctx.status(Scope::Project, "code-review"), "installed");
-    }
-
-    #[test]
-    fn names_from_before_the_rename_are_moved() {
-        let f = fixture();
-        let ctx = ctx(&f);
-        install(&ctx, Scope::Project, &["commit-gate"]);
-        let agents = f.project.join(".agents");
-        fs::rename(agents.join("afk.tsv"), agents.join("agentic-toolkit.tsv")).unwrap();
-        let old_shim = githook::shim("commit-gate").replace("# afk ", "# agentic-toolkit ");
-        fs::write(hook_file(&f), old_shim).unwrap();
-        assert_eq!(ctx.status(Scope::Project, "commit-gate"), "installed");
-        let moved = rename_legacy(Scope::Project, &f.project).unwrap();
-        assert_eq!(moved.len(), 2, "{moved:?}");
-        assert!(agents.join("afk.tsv").is_file() && !agents.join("agentic-toolkit.tsv").exists());
-        assert_eq!(
-            fs::read_to_string(hook_file(&f)).unwrap(),
-            githook::shim("commit-gate")
-        );
-        assert!(
-            rename_legacy(Scope::Project, &f.project)
-                .unwrap()
-                .is_empty()
-        );
     }
 
     #[test]

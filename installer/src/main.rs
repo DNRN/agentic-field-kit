@@ -102,16 +102,8 @@ fn run(
     names: &[String],
     all: bool,
 ) -> Result<bool, String> {
-    let mut renamed = Vec::new();
-    if action == Action::Update && !run.dry_run {
-        let root = ctx.scope_root(scope).expect("scope root");
-        renamed = engine::rename_legacy(scope, root).map_err(|e| e.to_string())?;
-        for line in &renamed {
-            println!("{line}");
-        }
-    }
     let plan: Plan = engine::plan_action(ctx, opts, action, scope, names, all)?;
-    if plan.steps.is_empty() && renamed.is_empty() {
+    if plan.steps.is_empty() {
         println!("Nothing to do.");
         return Ok(true);
     }
@@ -148,7 +140,7 @@ fn run(
         if action == Action::Install {
             ok &= warn_both_scopes(ctx, &plan, run);
         }
-        if (!applied.wrote.is_empty() || applied.changed || !renamed.is_empty())
+        if (!applied.wrote.is_empty() || applied.changed)
             && let Some(hint) = engine::commit_hint(ctx.root.as_deref().expect("project root"))
         {
             println!("{hint}");

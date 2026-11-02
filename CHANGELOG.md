@@ -4,9 +4,12 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-02
+
 ### Changed
 
-- Renamed to Agentic Field Kit, command `afk` ([ADR 0018](docs/adr/0018-rename-to-agentic-field-kit.md)). The installer binary is `afk` (package `agentic-field-kit`; the install scripts are `agentic-field-kit-installer.sh` and `.ps1`), the plugin and marketplace are `afk`, so skills are `/afk:<name>`, the manifest is `.agents/afk.tsv`, and the hook shim is marked `# afk commit-gate`. To upgrade: install the new release, remove `~/.cargo/bin/agentic-toolkit`, and run `afk --update` in each project, which moves `.agents/agentic-toolkit.tsv` to `.agents/afk.tsv` and rewrites the shim; commit the manifest. Plugin users: `/plugin install afk@afk`, then uninstall `agentic-toolkit@agentic-toolkit`. The installer still reads the old manifest, shim marker, and plugin name.
+- Renamed to Agentic Field Kit, command `afk` ([ADR 0018](docs/adr/0018-rename-to-agentic-field-kit.md)). The installer binary is `afk` (package `agentic-field-kit`; the install scripts are `agentic-field-kit-installer.sh` and `.ps1`), the plugin and marketplace are `afk`, so skills are `/afk:<name>`, the manifest is `.agents/afk.tsv`, and the hook shim is marked `# afk commit-gate`.
+- **Breaking:** the installer doesn't read the old names ([ADR 0019](docs/adr/0019-drop-agentic-toolkit-compatibility.md)). To upgrade a project installed with 0.3.0: run `agentic-toolkit --remove --all` there first, then install the new release, remove `~/.cargo/bin/agentic-toolkit`, and install again with `afk`. Plugin users: `/plugin install afk@afk`, then uninstall `agentic-toolkit@agentic-toolkit`.
 
 ## [0.3.0] - 2026-10-30
 
@@ -70,7 +73,8 @@ First release.
 
 - `./install.sh` installs into `~/.agents/skills` only (Codex, Gemini CLI, OpenCode, Cursor, omp). A copy in `~/.claude/skills` hid the plugin's `agentic-toolkit:*` skills in Claude Code, so that target is now opt-in (`--harness claude`) for Claude Code without the plugin. `--remove` still clears every target.
 
-[Unreleased]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.3.0...HEAD
+[Unreleased]: https://github.com/DNRN/agentic-field-kit/compare/afk--v0.4.0...HEAD
+[0.4.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.3.0...afk--v0.4.0
 [0.3.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.2.0...agentic-toolkit--v0.3.0
 [0.2.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.1.0...agentic-toolkit--v0.2.0
 [0.1.0]: https://github.com/DNRN/agentic-field-kit/releases/tag/agentic-toolkit--v0.1.0
