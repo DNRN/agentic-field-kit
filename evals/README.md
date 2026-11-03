@@ -52,10 +52,11 @@ evals/<component>/<case>/
 | | `seeded-bug` | Review finds the off-by-one: nothing committed, the user is asked |
 | | `plain-commit` | "Commit with message X" does not load `ship` |
 | project-init | `skip-dialogue` | Empty directory, user stays local and skips the questions: git repository, `AGENTS.md` pointing at `PROJECT.md`, `CLAUDE.md` importing `AGENTS.md`, open questions instead of guesses; no remote |
+| | `asks-title-first` | A bare "start a new project": the first question is the title, with one suggested from the folder name; no `git init` or remote question before it |
 | | `brief-given` | Brief given up front: `PROJECT.md` records the stated stack and non-goal and invents no technology |
 | | `existing-claude-md` | Rules in an existing `CLAUDE.md` move to `AGENTS.md`; `CLAUDE.md` imports it |
 | | `feature-request` | Feature work in a repository without `AGENTS.md`: adds the flag, creates no `AGENTS.md` or `PROJECT.md`, doesn't load the skill |
-| | `installed-copies` | A folder the installer prepared: the initial commit stages the skill's files, the manifest, and the copy it records; never `git add -A`, all of `.claude/`, or `settings.local.json` |
+| | `installed-copies` | A folder the installer prepared: the initial commit stages the skill's files, the manifest, and the copy it records; never `git add -A`, all of `.claude/`, or `settings.local.json`; the report suggests running `afk` for other components |
 
 ## Writing graders
 

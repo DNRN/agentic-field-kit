@@ -8,6 +8,11 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 
 - The menu's details pane says what each component does, in a few sentences under its one-line summary, from a new `details` column in `catalog.tsv` ([ADR 0020](docs/adr/0020-catalog-details-column.md)).
 
+### Changed
+
+- `project-init` asks for the project's title first, suggesting one from the folder name, then for a description in the user's own words, then offers the follow-up questions (skippable), and sets up git and the remote last. It used to set up git and ask about the remote before any question.
+- `project-init` ends by suggesting to run `afk` in the new project to install other components, when the afk installer set the folder up.
+
 ## [0.4.0] - 2026-11-02
 
 ### Changed
