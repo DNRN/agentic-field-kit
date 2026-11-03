@@ -9,14 +9,14 @@ CATALOG="$ROOT/catalog.tsv"
 fails=0
 fail() { echo "FAIL $*"; fails=$((fails + 1)); }
 
-[ "$(head -n1 "$CATALOG")" = "$(printf 'kind\tname\tpath\tharnesses\trequires\tsummary')" ] ||
-  fail "catalog.tsv: header must be: kind name path harnesses requires summary (tab-separated)"
+[ "$(head -n1 "$CATALOG")" = "$(printf 'kind\tname\tpath\tharnesses\trequires\tsummary\tdetails')" ] ||
+  fail "catalog.tsv: header must be: kind name path harnesses requires summary details (tab-separated)"
 
 names="" paths=""
 declare -a REQ_NAME REQ_LIST
 while IFS= read -r line; do
   IFS=$'\t' read -r -a f <<<"$line"
-  [ "${#f[@]}" -eq 6 ] || { fail "row needs 6 tab-separated columns: $line"; continue; }
+  [ "${#f[@]}" -eq 7 ] || { fail "row needs 7 tab-separated columns: $line"; continue; }
   kind=${f[0]} name=${f[1]} path=${f[2]} harn=${f[3]} req=${f[4]}
   [[ "$name" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || fail "$name: name must be kebab-case"
   case " $names " in *" $name "*) fail "$name: listed twice" ;; esac
