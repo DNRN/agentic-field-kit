@@ -44,7 +44,7 @@ Ask with the harness's question tool if it has one, otherwise in plain text. One
    - Both exist and `CLAUDE.md` doesn't import `AGENTS.md` → add `@AGENTS.md` as its first line.
    - `PROJECT.md` exists → resume: its title and description stand; ask only about its *Open questions* and missing sections, set up git (step 5) if needed, then update it in place.
 7. **Commit, if the user wants.** A remote still being created → ask once more: the URL now (connect it as in step 5), or stay local. Then ask whether to commit the files as the initial commit, and to push with `git push -u origin <branch>` when a remote is connected. Stage only the files this skill wrote (`git add AGENTS.md CLAUDE.md PROJECT.md`), and, when `.agents/afk.tsv` exists, what the afk installer put there: the manifest and each path in its `paths` column (such as `.agents/skills/project-init` and `.claude/skills/project-init`), which the installer says to commit. Not `git add -A`, which takes whatever else is in the directory, and not all of `.claude/`, which can hold personal files such as `settings.local.json`. With `user.name` or `user.email` unset, ask; never invent an identity.
-8. **Report**: branch and remote (or local only), files created or changed, the open questions left in `PROJECT.md`, and the next step: planning the first milestone.
+8. **Report**: branch and remote (or local only), files created or changed, the open questions left in `PROJECT.md`, and the next steps: planning the first milestone, and, when `.agents/afk.tsv` exists, running `afk` in the project folder to install other components, such as `code-review` and `commit-gate`. Don't run it yourself: without arguments it opens a menu that needs the user's terminal.
 
 ## Gotchas
 

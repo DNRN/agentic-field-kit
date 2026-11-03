@@ -7,6 +7,7 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 ### Changed
 
 - `project-init` asks for the project's title first, suggesting one from the folder name, then for a description in the user's own words, then offers the follow-up questions (skippable), and sets up git and the remote last. It used to set up git and ask about the remote before any question.
+- `project-init` ends by suggesting to run `afk` in the new project to install other components, when the afk installer set the folder up.
 
 ## [0.4.0] - 2026-11-02
 
