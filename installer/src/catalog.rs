@@ -1,4 +1,5 @@
-//! `catalog.tsv` (ADR 0007): kind, name, path, harnesses, requires, summary.
+//! `catalog.tsv` (ADR 0007, ADR 0020): kind, name, path, harnesses, requires,
+//! summary, details.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Component {
@@ -9,6 +10,8 @@ pub struct Component {
     /// Names this component can't work without; empty for `-`.
     pub requires: Vec<String>,
     pub summary: String,
+    /// A few sentences for the menu's details pane; empty when missing.
+    pub details: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -47,6 +50,7 @@ impl Catalog {
                     harnesses: field(3),
                     requires,
                     summary: field(5),
+                    details: field(6),
                 })
             })
             .collect();
@@ -79,14 +83,20 @@ mod tests {
     #[test]
     fn parses_rows_and_requires() {
         let c = Catalog::parse(
-            "kind\tname\tpath\tharnesses\trequires\tsummary\n\
-             skill\tcode-review\tskills/code-review\tall\t-\tReview\r\n\
+            "kind\tname\tpath\tharnesses\trequires\tsummary\tdetails\n\
+             skill\tcode-review\tskills/code-review\tall\t-\tReview\tReviews the diff.\r\n\
              # comment\n\n\
              hook\tcommit-gate\thooks/scripts/commit-gate.sh\tplugin\tcode-review,doc-sync\tGate\n",
         );
         assert_eq!(c.rows.len(), 2);
         assert!(c.get("code-review").unwrap().requires.is_empty());
         assert_eq!(c.get("code-review").unwrap().summary, "Review");
+        assert_eq!(c.get("code-review").unwrap().details, "Reviews the diff.");
+        assert_eq!(
+            c.get("commit-gate").unwrap().details,
+            "",
+            "a row without details"
+        );
         assert_eq!(
             c.get("commit-gate").unwrap().requires,
             ["code-review", "doc-sync"]

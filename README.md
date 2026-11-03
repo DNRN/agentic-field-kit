@@ -164,7 +164,7 @@ The installer is a native Windows program; it needs no Git Bash or WSL. Project 
 | [`evals/`](evals/) | Golden tasks per component in `claude plugin eval` format, scored against a no-plugin baseline | [`claude plugin eval .`](evals/README.md#run) |
 | [`tests/`](tests/) | Deterministic regression tests for hooks, the installer, `catalog.tsv`, and release metadata | `tests/run.sh` |
 | [`installer/`](installer/) | The Rust installer `afk`: command line and terminal UI, with the components built in ([plan](docs/plans/rust-installer.md)) | `cargo build --release` |
-| `catalog.tsv` | Every installable component: kind, path, harnesses, requirements, one-line summary ([ADR 0007](docs/adr/0007-component-catalog.md)) | Read by the installer |
+| `catalog.tsv` | Every installable component: kind, path, harnesses, requirements, a one-line summary, and a few sentences of details for the menu ([ADR 0007](docs/adr/0007-component-catalog.md), [ADR 0020](docs/adr/0020-catalog-details-column.md)) | Read by the installer |
 | [`assets/brand/`](assets/brand/) | The Entropy Fox name and logo the installer shows; not MIT ([ADR 0011](docs/adr/0011-brand-assets-not-mit.md)) | Built into the installer |
 | [`docs/`](docs/) | Rationale essays, [ADRs](docs/adr/), [plans](docs/plans/) | Read |
 
