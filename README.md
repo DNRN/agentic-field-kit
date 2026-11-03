@@ -185,7 +185,7 @@ Users of the plugin get a new release only when `version` in `.claude-plugin/plu
 1. Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a new `## [X.Y.Z] - YYYY-MM-DD` heading and add its compare link at the bottom.
 2. Set the same `X.Y.Z` in `.claude-plugin/plugin.json` and `installer/Cargo.toml`, then run `cargo build` to update `Cargo.lock` (semver: minor for new components or behavior, patch for fixes; a breaking rename or removal is a major once past 1.0).
 3. `tests/run.sh` (fails if the versions differ or have no dated changelog entry), then commit and merge to `main`.
-4. `claude plugin tag --push` creates and pushes `afk--vX.Y.Z` (the plugin) after checking that `plugin.json` and the marketplace entry agree.
+4. On the merge commit in `main`, with a clean working tree: `git tag afk--vX.Y.Z && git push origin afk--vX.Y.Z` tags the plugin release. The name is `plugin.json`'s `name` and `version`; the CHANGELOG's compare links use it.
 5. `git tag installer/vX.Y.Z && git push origin installer/vX.Y.Z` starts [`installer-release.yml`](.github/workflows/installer-release.yml), which builds the installer for every platform and publishes the GitHub release with its install scripts. dist can't read the plugin's tag, so the installer has its own.
 
 ## Contributing
