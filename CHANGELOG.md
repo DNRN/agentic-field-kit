@@ -4,6 +4,10 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 
 ## [Unreleased]
 
+### Added
+
+- The menu's details pane says what each component does, in a few sentences under its one-line summary, from a new `details` column in `catalog.tsv` ([ADR 0020](docs/adr/0020-catalog-details-column.md)).
+
 ## [0.4.0] - 2026-11-02
 
 ### Changed

@@ -1052,6 +1052,10 @@ fn details(app: &App) -> Text<'static> {
         Line::from(""),
     ];
     if let Some(c) = ctx.component(&row.name) {
+        if !c.details.is_empty() {
+            lines.push(Line::from(c.details.clone()));
+            lines.push(Line::from(""));
+        }
         if !c.requires.is_empty() {
             lines.push(Line::from(format!("Needs {}.", c.requires.join(", "))));
         }
@@ -1619,6 +1623,19 @@ mod tests {
         let text = screen(&app, 120, 40);
         assert!(text.contains("How to use"), "{text}");
         assert!(text.contains("afk --project . project-init"), "{text}");
+    }
+
+    #[test]
+    fn the_details_show_the_summary_and_the_longer_description() {
+        let f = fixture();
+        let mut app = app(&f);
+        app.cursor = row(&app, "code-review") - 1;
+        let text = screen(&app, 120, 40);
+        assert!(text.contains("Fresh-eyes review before commit"), "{text}");
+        assert!(
+            text.contains("Reviews the diff before you commit"),
+            "{text}"
+        );
     }
 
     #[test]
