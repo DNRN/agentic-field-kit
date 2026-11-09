@@ -1182,7 +1182,7 @@ fn table(app: &App) -> Table<'static> {
         [
             Constraint::Length(1),
             Constraint::Length(2),
-            Constraint::Length(14),
+            Constraint::Length(name_col(app)),
             Constraint::Length(6),
             Constraint::Length(9),
             Constraint::Length(9),
@@ -1191,6 +1191,11 @@ fn table(app: &App) -> Table<'static> {
     .header(head)
     .row_highlight_style(selected())
     .block(boxed("Components"))
+}
+
+/// The name column fits the longest component name; the other columns are fixed.
+fn name_col(app: &App) -> u16 {
+    list::name_width(app.rows.iter().map(|r| r.name.as_str())) as u16
 }
 
 /// Lines cut to `width` characters, so the popup knows how many rows it needs.
@@ -1314,7 +1319,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
     frame.render_widget(lines, text_area);
 
     let [left, right] =
-        Layout::horizontal([Constraint::Length(47), Constraint::Min(20)]).areas(body);
+        Layout::horizontal([Constraint::Length(34 + name_col(app)), Constraint::Min(20)])
+            .areas(body);
     let mut state = TableState::default().with_selected(Some(app.cursor));
     frame.render_stateful_widget(table(app), left, &mut state);
     frame.render_widget(
@@ -1574,7 +1580,9 @@ mod tests {
         let f = fixture();
         let mut app = app(&f);
         let n = row(&app, "commit-gate");
-        press(&mut app, &format!("{n}\n"));
+        // Past row 9, so no number key: the cursor and space mark it.
+        app.cursor = n - 1;
+        press(&mut app, " \n");
         let lines = review_lines(&app);
         assert!(
             lines.contains(&"  copy    .agents/hooks/commit-gate.sh".to_owned()),
@@ -1806,7 +1814,9 @@ mod tests {
         let f = fixture();
         let mut app = app(&f);
         let n = row(&app, "commit-gate");
-        press(&mut app, &format!("g{n}"));
+        press(&mut app, "g");
+        app.cursor = n - 1;
+        press(&mut app, " ");
         assert!(app.marks.is_empty());
         assert!(
             app.message.contains("git hooks are per repository"),
@@ -1820,7 +1830,8 @@ mod tests {
         let f = fixture();
         let mut app = app(&f);
         let n = row(&app, "commit-gate");
-        press(&mut app, &format!("{n}\ny\n"));
+        app.cursor = n - 1;
+        press(&mut app, " \ny\n");
         fs::remove_file(f.project.join(".git/hooks/pre-commit")).unwrap();
         app.refresh();
         assert_eq!(app.rows[n - 1].project, "inactive");

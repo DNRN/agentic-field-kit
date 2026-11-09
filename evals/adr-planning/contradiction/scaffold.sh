@@ -58,5 +58,15 @@ We will expose every service API as REST over HTTP/JSON.
 ## Consequences
 Uniform tooling and docs; no streaming or generated clients.
 EOF
+# Feature-planning settings, so that skill (which hands decisions to
+# adr-planning) doesn't stop to ask for the tracker.
+cat > AGENTS.md <<'EOF'
+# services
+
+## Feature planning
+
+- Tracker: none
+- Scout model: sonnet
+EOF
 git add -A
 git commit -qm "Initial service with ADRs"

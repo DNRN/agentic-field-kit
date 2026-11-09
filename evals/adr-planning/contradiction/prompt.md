@@ -6,4 +6,4 @@ timeout_seconds: 900
 allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Bash, Edit, Write]
 ---
 
-Plan a new inventory service that exposes its API over gRPC.
+Plan a new inventory service that exposes its API over gRPC. There is no issue or spec for it; this is the whole description.

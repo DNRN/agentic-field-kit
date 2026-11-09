@@ -12,12 +12,13 @@ The rules don't depend on the model remembering them: a git hook asks before an 
 
 | Component | Kind | What it does | Where it works |
 | --- | --- | --- | --- |
-| `adr-planning` | skill | Records design decisions as ADRs while planning, on request, or to supersede an Accepted one; briefs you and records your verdict | Every harness |
+| `adr-planning` | skill | Records design decisions as ADRs while a feature is planned, on request, or to supersede an Accepted one; briefs you and records your verdict | Every harness |
 | `code-review` | skill | Fresh-eyes review of a diff before commit, with severity-ranked findings and a verdict | Every harness |
 | `doc-sync` | skill | Keeps docs true to the code in the same commit | Every harness |
+| `feature-planning` | skill | Before a feature is built: fetches its whole description (the issue and its comments, or asks you), maps what it touches and makes obsolete, writes a plan in `docs/plans/`, and refines it with you in question rounds until you approve it; decisions go to `adr-planning` ([ADR 0021](docs/adr/0021-feature-planning-owns-feature-planning.md)) | Every harness |
 | `project-init` | skill | Starts a project: asks for a title and a description, then sets up git and a remote if you have one, and writes `PROJECT.md`, `AGENTS.md`, and `CLAUDE.md` | Every harness |
 | `ship` | skill | On "ship it": review, docs, commit message, commit | Every harness |
-| `code-reviewer` · `doc-auditor` | agent | Read-only subagents with fresh context for the two skills above | Claude Code |
+| `code-reviewer` · `doc-auditor` · `feature-scout` | agent | Read-only subagents with fresh context for `code-review`, `doc-sync`, and `feature-planning` | Claude Code |
 | `commit-gate` | hook | Asks before unreviewed commits and code changes without docs; denies edits to Accepted ADRs | Every harness as a git `pre-commit` hook (`afk commit-gate`); Claude Code also via the plugin |
 | `adr-index` | hook | Lists the Accepted ADRs at the start of each session | Claude Code, via the plugin |
 

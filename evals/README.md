@@ -41,13 +41,23 @@ evals/<component>/<case>/
 | | `new-flow-diagram` | New doc under `docs/` with exactly one mermaid diagram of submit → poll → fetch, linked from the index |
 | | `no-observable-change` | Internal rename: no doc edits, says why |
 | | `waived-check` | User waives the docs check: commits with `--no-verify`, never stamps docs |
-| adr-planning | `plan-feature` | Bootstraps `docs/adr/` and adds the decisions line to `AGENTS.md`, writes Proposed ADRs, plan references them, briefs each ADR and asks for a verdict |
+| adr-planning | `plan-feature` | OAuth login with the provider and session store named (so the decisions are made, and `feature-planning` hands them over at once): bootstraps `docs/adr/` and adds the decisions line to `AGENTS.md`, writes Proposed ADRs, plan references them, briefs each ADR and asks for a verdict |
 | | `existing-format` | Follows the project's ADR home, numbering, and sections |
 | | `contradiction` | Surfaces the conflict with an Accepted ADR and drafts a superseding one |
 | | `verdict` | Records a rejection and an acceptance in the Status sections; keeps the rejected ADR; follows up on the plan |
 | | `bug-fix` | Fixes a failing test without creating an ADR or loading the skill |
 | | `on-demand` | "Write an ADR that we use Postgres": next number, project's sections, Proposed, briefed with a verdict request, no invented reasons |
 | | `supersede` | Reverses an agreed-on Accepted ADR: new ADR 0003 supersedes 0002; 0002 changes only in its Status (so the commit gate's ADR check passes) |
+| feature-planning | `asks-for-source-first` | Bare "plan CSV import" with a tracker recorded: the first question asks for an external description; no tracker question, no plan yet |
+| | `tracker-setup` | No settings section; the user says there is no tracker: `AGENTS.md` gains one `## Feature planning` section with `- Tracker: none`, keeps its rules; no tracker or source question |
+| | `external-issue` | "Plan issue #12" through the repo-local `./tools/gh`: the plan cites the issue and carries the requirement from each comment (`--since`, `<id>.md` file names); invents nothing |
+| | `implement-request` | "Implement issue #7": a plan in `docs/plans/` and questions; no `.py` edit or write |
+| | `vague-request` | "We need reminders": blocking questions first, no code, the plan's *Open questions* is not empty |
+| | `deprecation` | A new export module replaces `legacy_export.export_csv`: the plan's *Deprecations* names it with both callers, and the user is asked remove or deprecate |
+| | `adr-conflict` | The team has decided on a Redis cache, against Accepted ADR 0002 (one local file, no server processes): the conflict is raised, a Proposed ADR superseding 0002 is drafted through `adr-planning`, 0002 is unchanged |
+| | `refine-round` | Answers to a scaffolded Draft plan: same file updated, log gains round 2 and keeps round 1, the answered items leave *Open questions*, status stays Draft until approval |
+| | `bug-fix` | Issue #15 (search misses imported notes, cause unknown): light path with *Reproduction* and *Root cause*, type bug, no *Benefits* or *Deprecations*; issue fetched with its comments |
+| | `small-change` | "Add a --verbose flag to cli.py" with settings recorded: the flag is added with no plan and no question first (the skill may load; its size gate skips it) |
 | ship | `golden` | "Ship it" on a correct change: review, README gains the new flag, one commit, no `--no-verify` |
 | | `seeded-bug` | Review finds the off-by-one: nothing committed, the user is asked |
 | | `plain-commit` | "Commit with message X" does not load `ship` |

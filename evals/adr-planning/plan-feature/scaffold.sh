@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Small service with no ADRs yet, and an AGENTS.md without a decisions line.
+# Its feature-planning settings keep that skill (which hands decisions to
+# adr-planning) from stopping to ask for the tracker.
 git init -q -b main
 git config user.name "Eval User"
 git config user.email eval@example.com
@@ -27,6 +29,11 @@ cat > AGENTS.md <<'EOF'
 # notes-service
 
 Small HTTP service for shared notes. Run `python app.py`.
+
+## Feature planning
+
+- Tracker: none
+- Scout model: sonnet
 EOF
 git add -A
 git commit -qm "Initial service"

@@ -55,6 +55,7 @@ Phase 1 comes first because it turns rules the model must remember into determin
 
 | Skill | Trigger ("use when …") | Core procedure |
 | --- | --- | --- |
+| `feature-planning` | Planning, implementing, or adding a feature; an issue to work on | Fetch the full description → impact map → deprecation scan → plan in `docs/plans/` → question rounds → *Ready* → `adr-planning` for the decisions. [Plan](feature-planning.md) |
 | `handoff` | Ending a session with unfinished work | Write `docs/handoff/<date>.md`: state, next steps, open decisions, linked ADRs |
 | `systematic-debugging` | A bug or failing test with unknown cause | Reproduce → isolate → prove root cause → fix → regression test |
 | `test-first` | Implementing behavior with a clear spec | Failing test first, minimal implementation, refactor |
@@ -72,6 +73,7 @@ Phase 1 comes first because it turns rules the model must remember into determin
 | --- | --- | --- | --- |
 | `scout` | fast/cheap | read-only | Map unfamiliar code and return compressed context |
 | `test-writer` | strong | read + write tests only | Write the covering test a review flagged as missing |
+| `feature-scout` | user's choice (recorded in `AGENTS.md`) | read-only | Impact and deprecation map for `feature-planning`. Once `scout` exists, `feature-scout` can become a checklist passed to it |
 | `adr-reviewer` | strong | read-only | Check a Proposed ADR for forces, real alternatives, rejection reasons, one-page size |
 | `security-reviewer` | strong | read-only | Backs the `security-review` skill with fresh eyes |
 
@@ -98,7 +100,7 @@ Policies first where a declarative deny rule suffices (per `policies/README.md`)
 | `AGENTS.md` base | rule | Points at `docs/adr/`, the commit-gate workflow, test and docs expectations; how `CLAUDE.md` imports it (`@AGENTS.md`, as [`project-init`](../../skills/project-init/SKILL.md) sets up) and `GEMINI.md` symlinks to it |
 | Stack rules | rules | Short per-language conventions (`rules/python.md`, `rules/typescript.md`) |
 | `adr.md` | prompt | ADR template extracted from the adr-planning skill (single source; the skill links it) |
-| `plan.md`, `pr.md` | prompts | Feature plan and PR templates referencing ADRs |
+| `pr.md` | prompt | PR template referencing ADRs. The feature plan template lives in [`feature-planning`](feature-planning.md)'s references ([ADR 0005](../adr/0005-rubrics-live-in-skills.md)) |
 | `reviewer` | output style | Findings-only, severity-ranked responses |
 | `explanatory` | output style | Teaching mode: rationale and tradeoffs alongside changes |
 
