@@ -2,11 +2,15 @@
 
 *Go AFK. Your agents won't cut corners.*
 
-Harness-agnostic collection of agent components: skills, subagents, commands, hooks, output styles, plus copy-paste rules, prompt templates, and permission policies. Works across projects and tools.
+A harness-agnostic toolkit for coding agents: skills, subagents, commands, hooks, and output styles, plus copy-paste rules, prompt templates, and permission policies. It works across projects and tools.
 
-Why this repo starts with an [ADR skill](docs/why-adrs.md): tests verify behavior; ADRs verify design — the missing half of most agent workflows. Why the [code review mechanism](docs/why-code-review.md) is three layers: fresh eyes, right moment, ask instead of nag. Why [docs must be kept true](docs/why-docs-matters.md): agents believe stale docs.
+**Rules that don’t depend on the model remembering them.** A git hook asks before an unreviewed commit, or one that leaves the docs behind, and denies edits to Accepted ADRs. It behaves the same in every harness and in a plain terminal.
 
-The rules don't depend on the model remembering them: a git hook asks before an unreviewed commit or one that leaves the docs behind, in every harness and in a terminal, and denies edits to Accepted ADRs.
+**Why it starts where it does**
+
+1. An ADR skill: tests verify behavior, ADRs verify design, the missing half of most agent workflows.
+2. A three-layer code review: fresh eyes, the right moment, ask instead of nag.
+3. Docs that stay true: agents believe stale docs.
 
 ## Components
 
