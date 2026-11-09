@@ -13,6 +13,7 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 ### Changed
 
 - `adr-planning` records the decisions of a feature plan and no longer claims planning the feature itself, which is `feature-planning`'s job.
+- README: the introduction states the aim plainly — an agent that does software as a team, not just as told — instead of the three-habits list, and the component table links `adr-planning`, `code-review`, and `doc-sync` to their why essays.
 - `project-init` asks for the project's title first, suggesting one from the folder name, then for a description in the user's own words, then offers the follow-up questions (skippable), and sets up git and the remote last. It used to set up git and ask about the remote before any question.
 - `project-init` ends by suggesting to run `afk` in the new project to install other components, when the afk installer set the folder up.
 - `afk --list` and the menu size the component column to the longest name (`feature-planning`), instead of cutting it at 14 characters.

@@ -2,21 +2,17 @@
 
 *Go AFK. Your agents won't cut corners.*
 
-Harness-agnostic agent components — skills, subagents, commands, hooks, output styles, plus copy-paste rules, prompt templates, and permission policies — built around three habits that agents skip when nobody checks:
+The idea of afk: an agent should do software the way a team does, not just what it was told. Told to implement a feature or fix a bug, a lone agent codes the ask and moves on; a team reviews the diff, keeps the docs true to the code, and records the decisions behind the change. afk is harness-agnostic components — skills, subagents, commands, hooks, output styles, plus copy-paste rules, prompt templates, and permission policies — that bring that team discipline to any agent: the codebase stays clean and well documented, and new features and bug fixes are solved by best software principles, not by the fastest patch that answers the prompt.
 
-- **Review before you commit.** A fresh-eyes review of the diff, not the memory of the agent that wrote it ([why](docs/why-code-review.md)).
-- **Keep the docs true.** When code changes, the docs that describe it change in the same commit ([why](docs/why-docs-matters.md)).
-- **Record design decisions.** Decisions become short, numbered ADRs, not chat history ([why](docs/why-adrs.md)).
-
-None of it depends on the model remembering the rules. A git `pre-commit` hook asks before an unreviewed commit or one that leaves the docs behind — in every harness and in a plain terminal — and stops edits to Accepted ADRs. Tests verify behavior; ADRs verify design: most agent workflows ship only the first half.
+None of it depends on the model remembering the rules. A git `pre-commit` hook asks before an unreviewed commit or one that leaves the docs behind — in every harness and in a plain terminal — and stops edits to Accepted ADRs. Tests verify behavior; ADRs verify design; docs carry the rest — most agent workflows automate only the first.
 
 ## Components
 
 | Component | Kind | What it does | Where it works |
 | --- | --- | --- | --- |
-| `adr-planning` | skill | Records design decisions as ADRs while a feature is planned, on request, or to supersede an Accepted one; briefs you and records your verdict | Every harness |
-| `code-review` | skill | Fresh-eyes review of a diff before commit, with severity-ranked findings and a verdict | Every harness |
-| `doc-sync` | skill | Keeps docs true to the code in the same commit | Every harness |
+| `adr-planning` | skill | Records design decisions as ADRs while a feature is planned, on request, or to supersede an Accepted one; briefs you and records your verdict ([why](docs/why-adrs.md)) | Every harness |
+| `code-review` | skill | Fresh-eyes review of a diff before commit, with severity-ranked findings and a verdict ([why](docs/why-code-review.md)) | Every harness |
+| `doc-sync` | skill | Keeps docs true to the code in the same commit ([why](docs/why-docs-matters.md)) | Every harness |
 | `feature-planning` | skill | Before a feature is built: fetches its whole description (the issue and its comments, or asks you), maps what it touches and makes obsolete, writes a plan in `docs/plans/`, and refines it with you in question rounds until you approve it; decisions go to `adr-planning` ([ADR 0021](docs/adr/0021-feature-planning-owns-feature-planning.md)) | Every harness |
 | `project-init` | skill | Starts a project: asks for a title and a description, then sets up git and a remote if you have one, and writes `PROJECT.md`, `AGENTS.md`, and `CLAUDE.md` | Every harness |
 | `ship` | skill | On "ship it": review, docs, commit message, commit | Every harness |
