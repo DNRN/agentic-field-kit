@@ -6,4 +6,4 @@ timeout_seconds: 900
 allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Bash, Edit, Write]
 ---
 
-We need to add OAuth login to the service. Plan it out.
+We need to add OAuth login to the service: people sign in with their Google account in the browser, and we keep their sessions server-side in a SQLite table. Plan it out. There is no issue or spec for it; this is the whole description.

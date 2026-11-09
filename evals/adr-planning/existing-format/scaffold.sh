@@ -54,5 +54,15 @@ Handlers run synchronously.
 ### Outcome
 Simple code; slow work must leave the request path.
 EOF
+# Feature-planning settings, so that skill (which hands decisions to
+# adr-planning) doesn't stop to ask for the tracker.
+cat > AGENTS.md <<'EOF'
+# mail-service
+
+## Feature planning
+
+- Tracker: none
+- Scout model: sonnet
+EOF
 git add -A
 git commit -qm "Initial service with decisions"

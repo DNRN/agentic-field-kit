@@ -1,6 +1,6 @@
 ---
 name: adr-planning
-description: Use when planning or defining a new feature and architectural decisions arise - record each significant decision as an Architecture Decision Record (ADR) before implementation starts, brief the user, and record their verdict. Also use when the user asks to write, record, or create an ADR for a decision, to supersede, replace, or reverse an Accepted ADR, or accepts, rejects, or wants to change a Proposed ADR. Skip for bug fixes, chores, and choices with no lasting structural impact.
+description: Use when an architectural decision arises - while a feature is planned (often handed over by feature-planning), during design, or in code - record each significant decision as an Architecture Decision Record (ADR) before it is implemented, brief the user, and record their verdict. Also use when the user asks to write, record, or create an ADR for a decision, to supersede, replace, or reverse an Accepted ADR, or accepts, rejects, or wants to change a Proposed ADR. Skip for bug fixes, chores, and choices with no lasting structural impact.
 ---
 
 # ADR planning
@@ -9,7 +9,7 @@ Architecture decisions made during feature planning get captured as [ADRs](https
 
 ## When this applies
 
-- The user asks to plan, design, or scope a new feature, service, or migration.
+- A feature is being planned (by `feature-planning`, or by the user directly) and a decision needs recording. The planning itself (description, impact, question rounds) is `feature-planning`'s job; this skill records the decisions it hands over.
 - During planning, a choice appears that is hard to reverse, crosses module or service boundaries, constrains future work, or carries real tradeoffs: frameworks, data models, protocols, storage engines, sync vs async, monolith vs services.
 - The user asks to record a decision as an ADR outside a planning flow: see [Record a decision on demand](#record-a-decision-on-demand).
 - The user wants to change, replace, or reverse an Accepted decision: see [Supersede an Accepted ADR](#supersede-an-accepted-adr).

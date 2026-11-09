@@ -19,6 +19,16 @@ pub fn rows(ctx: &Ctx) -> Vec<String> {
     rows
 }
 
+/// Width of the component-name column: the longest name, and at least the header's room.
+pub fn name_width<'a>(names: impl IntoIterator<Item = &'a str>) -> usize {
+    names
+        .into_iter()
+        .map(|n| n.chars().count())
+        .max()
+        .unwrap_or(0)
+        .max(14)
+}
+
 /// `why` is the reason there is no project, when there is none.
 pub fn table(ctx: &Ctx, why: Option<&str>) -> String {
     let mut out = String::new();
@@ -52,14 +62,16 @@ pub fn table(ctx: &Ctx, why: Option<&str>) -> String {
     .unwrap();
     writeln!(out, "Claude Code plugin: {plug}").unwrap();
     writeln!(out).unwrap();
+    let names = rows(ctx);
+    let w = name_width(names.iter().map(String::as_str));
     writeln!(
         out,
-        "  {:>2}  {:<14} {:<6} {:<9} {:<9} summary",
+        "  {:>2}  {:<w$} {:<6} {:<9} {:<9} summary",
         "#", "component", "kind", "project", "global"
     )
     .unwrap();
     let mut dup = false;
-    for (i, n) in rows(ctx).iter().enumerate() {
+    for (i, n) in names.iter().enumerate() {
         let (kind, mut sum, mut notes) = match ctx.component(n) {
             Some(c) => {
                 let mut notes = match c.harnesses.as_str() {
@@ -106,7 +118,7 @@ pub fn table(ctx: &Ctx, why: Option<&str>) -> String {
         }
         writeln!(
             out,
-            "  {:>2}  {:<14} {:<6} {:<9} {:<9} {}",
+            "  {:>2}  {:<w$} {:<6} {:<9} {:<9} {}",
             i + 1,
             n,
             kind,

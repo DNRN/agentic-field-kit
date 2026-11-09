@@ -8,7 +8,7 @@
   "repository": "https://github.com/DNRN/agentic-field-kit",
   "license": "MIT",
   "keywords": ["agents", "skills", "commands", "hooks", "rules", "templates"],
-  "agents": ["./agents/code-reviewer.md", "./agents/doc-auditor.md"],
+  "agents": ["./agents/code-reviewer.md", "./agents/doc-auditor.md", "./agents/feature-scout.md"],
   "commands": [],
   "outputStyles": []
 }

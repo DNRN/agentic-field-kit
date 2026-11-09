@@ -49,7 +49,7 @@ project() { # fresh git repository → path
 }
 st() { # scope-column(project|global) name [installer args] → status from --list
   local col=$1 n=$2; shift 2
-  "$I" --list "$@" | awk -v n="$n" -v c="$([ "$col" = project ] && echo 4 || echo 5)" '$2 == n { print $c }'
+  "$I" --list "$@" | awk -v n="$n" -v c="$([ "$col" = project ] && echo 4 || echo 5)" '$1 ~ /^[0-9]+$/ && $2 == n { print $c }'
 }
 row() { cut -f2,5 "$1/.agents/afk.tsv" 2>/dev/null | grep -x "$2" >/dev/null; }
 in_manifest() { cut -f2 "$1/.agents/afk.tsv" 2>/dev/null | grep -qx "$2"; }
