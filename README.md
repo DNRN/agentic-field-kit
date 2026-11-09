@@ -2,11 +2,13 @@
 
 *Go AFK. Your agents won't cut corners.*
 
-Harness-agnostic collection of agent components: skills, subagents, commands, hooks, output styles, plus copy-paste rules, prompt templates, and permission policies. Works across projects and tools.
+Harness-agnostic agent components — skills, subagents, commands, hooks, output styles, plus copy-paste rules, prompt templates, and permission policies — built around three habits that agents skip when nobody checks:
 
-Why this repo starts with an [ADR skill](docs/why-adrs.md): tests verify behavior; ADRs verify design — the missing half of most agent workflows. Why the [code review mechanism](docs/why-code-review.md) is three layers: fresh eyes, right moment, ask instead of nag. Why [docs must be kept true](docs/why-docs-matters.md): agents believe stale docs.
+- **Review before you commit.** A fresh-eyes review of the diff, not the memory of the agent that wrote it ([why](docs/why-code-review.md)).
+- **Keep the docs true.** When code changes, the docs that describe it change in the same commit ([why](docs/why-docs-matters.md)).
+- **Record design decisions.** Decisions become short, numbered ADRs, not chat history ([why](docs/why-adrs.md)).
 
-The rules don't depend on the model remembering them: a git hook asks before an unreviewed commit or one that leaves the docs behind, in every harness and in a terminal, and denies edits to Accepted ADRs.
+None of it depends on the model remembering the rules. A git `pre-commit` hook asks before an unreviewed commit or one that leaves the docs behind — in every harness and in a plain terminal — and stops edits to Accepted ADRs. Tests verify behavior; ADRs verify design: most agent workflows ship only the first half.
 
 ## Components
 
@@ -19,7 +21,7 @@ The rules don't depend on the model remembering them: a git hook asks before an 
 | `project-init` | skill | Starts a project: asks for a title and a description, then sets up git and a remote if you have one, and writes `PROJECT.md`, `AGENTS.md`, and `CLAUDE.md` | Every harness |
 | `ship` | skill | On "ship it": review, docs, commit message, commit | Every harness |
 | `code-reviewer` · `doc-auditor` · `feature-scout` | agent | Read-only subagents with fresh context for `code-review`, `doc-sync`, and `feature-planning` | Claude Code |
-| `commit-gate` | hook | Asks before unreviewed commits and code changes without docs; denies edits to Accepted ADRs | Every harness as a git `pre-commit` hook (`afk commit-gate`); Claude Code also via the plugin |
+| `commit-gate` | hook | Asks before unreviewed commits and code changes without docs; stops edits to Accepted ADRs | Every harness as a git `pre-commit` hook (`afk commit-gate`); Claude Code also via the plugin |
 | `adr-index` | hook | Lists the Accepted ADRs at the start of each session | Claude Code, via the plugin |
 
 `afk --list` shows the same list with what is installed where.
@@ -35,9 +37,15 @@ The rules don't depend on the model remembering them: a git hook asks before an 
 
 Skills follow the [Agent Skills](https://agentskills.io) open standard — identical folders load natively in every harness above. The commit gate reaches every harness through git, which they all use to commit. The other component categories currently auto-load only via the Claude Code plugin; adapters for other harnesses are welcome.
 
+Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#evidence)):
+
+- Gemini CLI loads project skills only in a [trusted folder](https://geminicli.com/docs/cli/trusted-folders/). Gemini CLI and Cursor find them only when started at the repository root.
+- A skill installed both in the project and globally: Codex lists it twice, Claude Code and Cursor use the global copy. `--list` flags it, and a project install offers to remove the global copy.
+- With the plugin enabled at user scope, Claude Code lists a project `code-review` next to the plugin's `afk:code-review`. Enable the plugin for the project instead, or install only the plugin.
+
 ## Install
 
-Install only the components you need, into the project that needs them. The `afk` installer copies them into the repository; commit them, and every teammate and every harness gets the same version. It is one binary with the components built in: no clone, git, or runtime needed.
+Install only the components you need, into the project that needs them. `afk` is one binary with every component built in — no clone, git, or runtime needed. It copies components into the repository; commit them, and every teammate and every harness gets the same version.
 
 ```bash
 # macOS, Linux
@@ -51,12 +59,16 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/DNRN/agentic-field
 
 Both put `afk` in `~/.cargo/bin`; the [release page](https://github.com/DNRN/agentic-field-kit/releases/latest) has the archives and checksums. With Rust: `cargo install --locked --git https://github.com/DNRN/agentic-field-kit agentic-field-kit`.
 
+Then, in a project:
+
 ```bash
 cd ~/code/your-project
 afk                  # the menu: what can be installed, what is installed
 afk code-reviewer    # or name components; what they require comes along
 git add .agents .claude && git commit -m "Add afk components"
 ```
+
+### Command reference
 
 | Command | Effect |
 | --- | --- |
@@ -70,7 +82,9 @@ git add .agents .claude && git commit -m "Add afk components"
 | `afk --check` | Validate skills against the Agent Skills portability rules |
 | `--source DIR` | Use a toolkit working tree instead of the built-in components (contributors) |
 
-Where a project install puts things ([ADR 0006](docs/adr/0006-project-scope-install-default.md)):
+### Where a project install puts things
+
+[ADR 0006](docs/adr/0006-project-scope-install-default.md):
 
 | Path | Read by |
 | --- | --- |
@@ -80,13 +94,18 @@ Where a project install puts things ([ADR 0006](docs/adr/0006-project-scope-inst
 | `.agents/hooks/<name>.sh` | Git, through the clone's `pre-commit` hook: the commit gate, in every harness and in a terminal ([ADR 0014](docs/adr/0014-git-hook-layout.md)) |
 | `.agents/afk.tsv` | The installer: what it installed, why, and a content hash of each ([ADR 0008](docs/adr/0008-project-install-manifest.md)) |
 
-**Updating.** Install the new release the same way, then run `afk --update` in each project ([ADR 0010](docs/adr/0010-components-embedded-in-binary.md)). Components have no version numbers of their own. `--list` compares each copy with the hash recorded at install time and with the installer's: `outdated` (changed in the new release), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it), `inactive` (a hook whose copy is current but that git doesn't run in this clone yet). The installer never touches a file it didn't install (`foreign`).
+### Updating
 
-Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#evidence)):
+Install the new release the same way, then run `afk --update` in each project ([ADR 0010](docs/adr/0010-components-embedded-in-binary.md)). Components have no version numbers of their own; `--list` compares each copy with the hash recorded at install time and with the installer's:
 
-- Gemini CLI loads project skills only in a [trusted folder](https://geminicli.com/docs/cli/trusted-folders/). Gemini CLI and Cursor find them only when started at the repository root.
-- A skill installed both in the project and globally: Codex lists it twice, Claude Code and Cursor use the global copy. `--list` flags it, and a project install offers to remove the global copy.
-- With the plugin enabled at user scope, Claude Code lists a project `code-review` next to the plugin's `afk:code-review`. Enable the plugin for the project instead, or install only the plugin.
+| `--list` status | Meaning |
+| --- | --- |
+| `outdated` | Changed in the new release; `--update` refreshes it |
+| `modified` | Edited in the project; `--update` and `--remove` leave it alone without `--force` |
+| `missing` | Deleted by hand; `--update` restores it |
+| `retired` | Gone from the toolkit; `--update` asks before removing it |
+| `inactive` | A hook whose copy is current but that git doesn't run in this clone yet |
+| `foreign` | A file the installer never installed; never touched |
 
 ### The commit gate
 
@@ -109,9 +128,9 @@ Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#e
 
 ### Start a new project
 
-Run `afk` in the folder where the project should be. Outside a git repository it opens a new project screen ([ADR 0016](docs/adr/0016-new-project-screen.md)): it shows the folder you are in and what is there, and asks whether to start the project here, in a new folder inside it, or to browse components instead. Your home folder is never made a project; you name a new folder inside it.
+Run `afk` in the folder where the project should be. Outside a git repository it opens a new-project screen ([ADR 0016](docs/adr/0016-new-project-screen.md)): it shows the folder you are in and what is there, and asks whether to start the project here, in a new folder inside it, or to browse components instead. Your home folder is never made a project; you name a new folder inside it.
 
-Starting a project is the `project-init` skill's job, and it runs in your agent: it asks for the project's title (suggesting the folder name) and a description in your words, offers a few more questions you can skip, then sets up git (and a remote, if you have one) and writes `PROJECT.md`, `AGENTS.md`, and a `CLAUDE.md` that imports it. So the installer installs `project-init` into the folder you picked, then starts your agent there with "Start a new project in this folder with the project-init skill." ([ADR 0017](docs/adr/0017-hand-off-to-the-agent.md)). It starts Claude Code (`claude`) and omp (`omp`) when they are on your `PATH`, and asks which when both are; for other agents it prints the step to take yourself.
+The setup itself is the `project-init` skill's job, and it runs in your agent. It asks for the project's title (suggesting the folder name) and a description in your words, offers a few more questions you can skip, then sets up git (and a remote, if you have one) and writes `PROJECT.md`, `AGENTS.md`, and a `CLAUDE.md` that imports it. The installer installs `project-init` into the folder you picked, then starts your agent there with "Start a new project in this folder with the project-init skill." ([ADR 0017](docs/adr/0017-hand-off-to-the-agent.md)). It starts Claude Code (`claude`) and omp (`omp`) when they are on your `PATH`, and asks which when both are; for other agents it prints the step to take yourself.
 
 Without the menu, the same in two commands:
 
@@ -140,7 +159,9 @@ For a skill you want in every repository, such as `adr-planning`, or one you use
 
 The installer is a native Windows program; it needs no Git Bash or WSL. Project installs contain no symlinks, so a Windows checkout works without `core.symlinks`. From WSL, `--global` reaches only the Linux-side harnesses.
 
-## Claude Code full bundle (also loads agents, commands, hooks, styles)
+## Claude Code plugin
+
+Beyond the skills, the plugin also auto-loads the agents, commands, hooks, and output styles:
 
 ```
 /plugin marketplace add DNRN/agentic-field-kit
