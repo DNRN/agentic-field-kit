@@ -4,6 +4,10 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 
 ## [Unreleased]
 
+### Fixed
+
+- Installer releases build the Apple Silicon macOS binary again: dist 0.34.0 builds it on `macos-15`, since GitHub retired the `macos-14` runner on 2026-11-02 and cancelled that build.
+
 ## [0.5.0] - 2026-11-10
 
 ### Added
