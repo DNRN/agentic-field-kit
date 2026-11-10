@@ -9,6 +9,7 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 - The menu's details pane says what each component does, in a few sentences under its one-line summary, from a new `details` column in `catalog.tsv` ([ADR 0020](docs/adr/0020-catalog-details-column.md)).
 - `feature-planning` skill: before a feature is built, fetches its whole description from the project's tracker (issue, comments, linked items) or asks for one, maps what it touches and makes obsolete, writes a plan in `docs/plans/<slug>.md`, and refines it with the user in question rounds until it is approved; architectural decisions go to `adr-planning`. It records the project's tracker (or `none`) and scout model in a `## Feature planning` section of `AGENTS.md`. Small, fully specified changes skip it ([ADR 0021](docs/adr/0021-feature-planning-owns-feature-planning.md), [plan](docs/plans/feature-planning.md)).
 - `feature-scout` agent (Claude Code): read-only impact and deprecation mapping for `feature-planning`, in a fresh context.
+- `scripts/prepare-release.sh [major|minor|patch]` prepares a release: shows the latest GitHub release, asks whether the new one is major, minor, or patch (suggesting one from the sections under `[Unreleased]`), dates those entries, updates the compare links, sets the version in `plugin.json`, `installer/Cargo.toml`, and `Cargo.lock`, and runs `tests/run.sh` ([README](README.md#releasing)).
 
 ### Changed
 

@@ -187,6 +187,8 @@ The installer is a native Windows program; it needs no Git Bash or WSL. Project 
 
 Users of the plugin get a new release only when `version` in `.claude-plugin/plugin.json` changes; with an unchanged version, `claude plugin update` reports the plugin as current.
 
+`scripts/prepare-release.sh` does steps 1–2 and the tests of step 3, and prints the commands for the rest. It shows the latest GitHub release (through [`gh`](https://cli.github.com), signed in) and what `[Unreleased]` holds, then asks whether the release is major, minor, or patch. Enter takes the suggestion from the changelog: a `**Breaking:**` entry or a `### Removed` section is major (minor while 0.x), `### Added`, `### Changed`, or `### Deprecated` is minor, and only `### Fixed` or `### Security` is patch. `scripts/prepare-release.sh minor` skips the question. It refuses to run with uncommitted changes in the files it edits, an empty `[Unreleased]`, or a `plugin.json` version or newest changelog release that differs from the latest GitHub release.
+
 1. Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a new `## [X.Y.Z] - YYYY-MM-DD` heading and add its compare link at the bottom.
 2. Set the same `X.Y.Z` in `.claude-plugin/plugin.json` and `installer/Cargo.toml`, then run `cargo build` to update `Cargo.lock` (semver: minor for new components or behavior, patch for fixes; a breaking rename or removal is a major once past 1.0).
 3. `tests/run.sh` (fails if the versions differ or have no dated changelog entry), then commit and merge to `main`.
