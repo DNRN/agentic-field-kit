@@ -9,7 +9,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use ratatui::layout::{Constraint, Flex, Layout};
+use ratatui::layout::{Constraint, Flex, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{
@@ -99,6 +99,8 @@ pub enum Screen {
     Review(Review),
     Result(Vec<String>),
     Help,
+    /// `q` with components still marked: quitting would drop the marks.
+    ConfirmQuit,
 }
 
 pub struct App {
@@ -238,6 +240,10 @@ impl App {
             Screen::List => self.on_list_key(key.code),
             Screen::Result(_) => match key.code {
                 KeyCode::Char('q') => self.quit = true,
+                _ => self.screen = Screen::List,
+            },
+            Screen::ConfirmQuit => match key.code {
+                KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Char('q') => self.quit = true,
                 _ => self.screen = Screen::List,
             },
             Screen::Help | Screen::Review(_) | Screen::NewProject(_) | Screen::PickAgent(_) => {
@@ -426,7 +432,7 @@ impl App {
             KeyCode::PageDown => review.scroll = (review.scroll + visible.max(1)).min(last),
             KeyCode::Home => review.scroll = 0,
             KeyCode::End => review.scroll = last,
-            KeyCode::Char('y') | KeyCode::Char('Y') => {
+            KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
                 let blocked = review.blocked.clone();
                 if self.dry_run {
                     self.screen = Screen::List;
@@ -439,17 +445,25 @@ impl App {
                     self.apply();
                 }
             }
-            _ => {
+            KeyCode::Esc
+            | KeyCode::Char('n')
+            | KeyCode::Char('N')
+            | KeyCode::Char('q')
+            | KeyCode::Backspace
+            | KeyCode::Left => {
                 self.screen = Screen::List;
                 self.message = "Nothing changed.".into();
             }
+            // A stray key neither applies nor throws the plan away.
+            _ => {}
         }
     }
 
     fn on_list_key(&mut self, code: KeyCode) {
         self.message.clear();
         match code {
-            KeyCode::Char('q') | KeyCode::Esc => self.quit = true,
+            KeyCode::Char('q') | KeyCode::Esc if self.marks.is_empty() => self.quit = true,
+            KeyCode::Char('q') | KeyCode::Esc => self.screen = Screen::ConfirmQuit,
             KeyCode::Up | KeyCode::Char('k') => self.cursor = self.cursor.saturating_sub(1),
             KeyCode::Down | KeyCode::Char('j') => {
                 self.cursor = (self.cursor + 1).min(self.rows.len().saturating_sub(1))
@@ -525,6 +539,22 @@ impl App {
                 self.marks.insert(row.name, Mark::Remove);
             }
         }
+    }
+
+    /// "install 2, remove 1": the marks by kind, in the order they apply.
+    pub fn mark_summary(&self) -> String {
+        [
+            (Mark::Install, "install"),
+            (Mark::Update, "update"),
+            (Mark::Remove, "remove"),
+        ]
+        .iter()
+        .filter_map(|(mark, word)| {
+            let n = self.marks.values().filter(|m| *m == mark).count();
+            (n > 0).then(|| format!("{word} {n}"))
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
     }
 
     /// Marks every component `--update` would change.
@@ -1034,11 +1064,55 @@ fn header(app: &App) -> Vec<Line<'static>> {
             Span::styled(" · ", dim()),
             Span::raw(format!("Agentic Field Kit {}", ctx.version)),
         ]),
-        Line::from(""),
+        steps(app),
         field("Project  ", project),
         field("Plugin   ", plugin.to_owned()),
         field("Harness  ", detected_harnesses(&ctx.home).join(", ")),
     ]
+}
+
+/// "1 Select › 2 Review › 3 Done" with the current step lit.
+fn steps(app: &App) -> Line<'static> {
+    let current = match app.screen {
+        Screen::Review(_) => 1,
+        Screen::Result(_) => 2,
+        _ => 0,
+    };
+    let mut spans = Vec::new();
+    for (i, step) in ["Select", "Review", "Done"].iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled(" › ", dim()));
+        }
+        let style = if i == current {
+            accent().add_modifier(Modifier::BOLD)
+        } else {
+            dim()
+        };
+        spans.push(Span::styled(format!("{} {step}", i + 1), style));
+    }
+    Line::from(spans)
+}
+
+/// The status line: a message if there is one, else what to do next.
+fn status_line(app: &App) -> Line<'static> {
+    if !app.message.is_empty() || app.screen != Screen::List {
+        return Line::from(app.message.clone());
+    }
+    if app.marks.is_empty() {
+        return Line::from(Span::styled(
+            "Mark components with space or 1-9, then press enter to review.",
+            dim(),
+        ));
+    }
+    Line::from(vec![
+        Span::styled(
+            format!("{} marked ({})", app.marks.len(), app.mark_summary()),
+            accent(),
+        ),
+        Span::styled(" · press ", dim()),
+        Span::styled("enter", title()),
+        Span::styled(" to review and install", dim()),
+    ])
 }
 
 fn details(app: &App) -> Text<'static> {
@@ -1214,6 +1288,17 @@ fn wrap(lines: &[String], width: usize) -> Vec<String> {
     out
 }
 
+/// A popup's width, its wrapped lines, height, and how many of them show.
+fn popup_fit(area: Rect, lines: &[String]) -> (u16, Vec<String>, u16, usize) {
+    let width = area.width.saturating_sub(4).min(100);
+    let wrapped = wrap(lines, width.saturating_sub(2) as usize);
+    let height = (wrapped.len() as u16 + 4)
+        .min(area.height.saturating_sub(2))
+        .max(5);
+    let visible = height.saturating_sub(4) as usize;
+    (width, wrapped, height, visible)
+}
+
 /// A centred box with `lines` from `scroll` on, and `keys` at the bottom.
 /// Returns the wrapped line count and how many rows were visible.
 fn popup(
@@ -1224,12 +1309,7 @@ fn popup(
     scroll: usize,
 ) -> (usize, usize) {
     let area = frame.area();
-    let width = area.width.saturating_sub(4).min(100);
-    let wrapped = wrap(lines, width.saturating_sub(2) as usize);
-    let height = (wrapped.len() as u16 + 4)
-        .min(area.height.saturating_sub(2))
-        .max(5);
-    let visible = height.saturating_sub(4) as usize;
+    let (width, wrapped, height, visible) = popup_fit(area, lines);
     let scroll = scroll.min(wrapped.len().saturating_sub(visible));
     let [v] = Layout::vertical([Constraint::Length(height)])
         .flex(Flex::Center)
@@ -1260,13 +1340,17 @@ fn popup(
 }
 
 const KEYS: &str = "↑↓ move · space/1-9 mark · u update · g scope · enter review · ? help · q quit";
+/// With marks, the next step leads.
+const MARKED_KEYS: &str =
+    "enter review & install · space/1-9 mark · u update · g scope · ? help · q quit";
 
-const HELP: [&str; 9] = [
+const HELP: [&str; 10] = [
     "Marks: + install (with what it needs), - remove, ~ update.",
     "space or a row number marks the component under it; again clears the mark.",
     "u marks everything --update would change: outdated, missing, retired.",
     "g switches between the project and the global scope (marks are cleared).",
-    "enter shows the plan; y applies it, any other key goes back.",
+    "enter shows the plan; enter or y applies it, esc goes back.",
+    "q with components marked asks before dropping the marks.",
     "",
     "Project installs are copies in .agents/ and .claude/; commit them.",
     "Locally edited copies are never overwritten or removed (use --force).",
@@ -1330,20 +1414,43 @@ pub fn draw(frame: &mut Frame, app: &App) {
         right,
     );
 
-    frame.render_widget(Paragraph::new(app.message.clone()), status);
-    frame.render_widget(Paragraph::new(key_line(KEYS)), keys);
+    frame.render_widget(Paragraph::new(status_line(app)), status);
+    // A popup shows its own keys; the list's would contradict them.
+    let footer = if app.screen != Screen::List {
+        Line::default()
+    } else if app.marks.is_empty() {
+        key_line(KEYS)
+    } else {
+        let mut line = key_line(MARKED_KEYS);
+        if let Some(first) = line.spans.first_mut() {
+            first.style = accent().add_modifier(Modifier::BOLD);
+        }
+        line
+    };
+    frame.render_widget(Paragraph::new(footer), keys);
 
     match &app.screen {
         Screen::List | Screen::NewProject(_) | Screen::PickAgent(_) => {}
         Screen::Review(review) => {
+            let (_, wrapped, _, visible) = popup_fit(area, &review.lines);
+            let total = wrapped.len();
+            let at_end = review.scroll.min(total.saturating_sub(visible)) + visible >= total;
             let keys = if app.dry_run {
-                "dry run: any key back"
+                "dry run: esc back"
             } else if review.blocked.is_some() {
-                "can't apply: any key back"
+                "can't apply: esc back"
+            } else if at_end || app.review_seen_end.get() {
+                "enter/y apply · esc back"
             } else {
-                "↑↓ scroll · y apply · any other key back"
+                "scroll to the end to apply · esc back"
             };
-            let (total, visible) = popup(frame, "Plan", &review.lines, keys, review.scroll);
+            let summary = app.mark_summary();
+            let title = if summary.is_empty() {
+                "Plan".to_owned()
+            } else {
+                format!("Plan: {summary}")
+            };
+            let (total, visible) = popup(frame, &title, &review.lines, keys, review.scroll);
             app.review_rows.set((total, visible));
             if review.scroll.min(total.saturating_sub(visible)) + visible >= total {
                 app.review_seen_end.set(true);
@@ -1355,6 +1462,14 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Screen::Help => {
             let lines: Vec<String> = HELP.iter().map(|s| (*s).to_owned()).collect();
             popup(frame, "Help", &lines, "any key back", 0);
+        }
+        Screen::ConfirmQuit => {
+            let lines = vec![format!(
+                "{} marked ({}). Quit without installing?",
+                app.marks.len(),
+                app.mark_summary()
+            )];
+            popup(frame, "Quit", &lines, "y/q quit · any other key back", 0);
         }
     }
 }
@@ -1556,9 +1671,76 @@ mod tests {
         let mut app = app(&f);
         press(&mut app, "12\nn");
         assert_eq!(app.screen, Screen::List);
+        // The marks survive declining, so quitting asks first.
         press(&mut app, "q");
+        assert_eq!(app.screen, Screen::ConfirmQuit);
+        press(&mut app, "y");
         assert!(app.quit);
         assert!(!f.project.join(".agents").exists());
+    }
+
+    #[test]
+    fn enter_twice_marks_reviews_and_applies() {
+        let f = fixture();
+        let mut app = app(&f);
+        let n = row(&app, "doc-sync");
+        press(&mut app, &format!("{n}\n\n"));
+        assert!(matches!(app.screen, Screen::Result(_)));
+        assert!(f.project.join(".agents/skills/doc-sync/SKILL.md").is_file());
+    }
+
+    #[test]
+    fn a_stray_key_in_the_plan_neither_applies_nor_goes_back() {
+        let f = fixture();
+        let mut app = app(&f);
+        let n = row(&app, "doc-sync");
+        press(&mut app, &format!("{n}\nx"));
+        assert!(matches!(app.screen, Screen::Review(_)));
+        app.on_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(app.screen, Screen::List);
+        assert_eq!(app.message, "Nothing changed.");
+        assert!(!f.project.join(".agents").exists());
+    }
+
+    #[test]
+    fn q_without_marks_quits_and_with_marks_can_go_back() {
+        let f = fixture();
+        let mut app = app(&f);
+        press(&mut app, "1q");
+        assert_eq!(app.screen, Screen::ConfirmQuit);
+        assert!(screen(&app, 100, 30).contains("1 marked (install 1). Quit without installing?"));
+        press(&mut app, "n");
+        assert_eq!(app.screen, Screen::List);
+        assert!(!app.quit);
+        press(&mut app, "1q");
+        assert!(app.quit, "nothing marked: q quits at once");
+    }
+
+    #[test]
+    fn marks_change_the_footer_and_say_what_to_do_next() {
+        let f = fixture();
+        let mut app = app(&f);
+        let text = screen(&app, 100, 30);
+        assert!(text.contains("Mark components with space or 1-9"), "{text}");
+        assert!(text.contains("enter review ·"), "{text}");
+        press(&mut app, "12");
+        let text = screen(&app, 100, 30);
+        assert!(text.contains("2 marked (install 2)"), "{text}");
+        assert!(text.contains("enter review & install ·"), "{text}");
+    }
+
+    #[test]
+    fn the_steps_follow_the_screens() {
+        let f = fixture();
+        let mut app = app(&f);
+        assert!(screen(&app, 100, 30).contains("1 Select › 2 Review › 3 Done"));
+        let n = row(&app, "doc-sync");
+        press(&mut app, &format!("{n}\n"));
+        let text = screen(&app, 100, 30);
+        assert!(text.contains("Plan: install 1"), "{text}");
+        assert!(text.contains("enter/y apply · esc back"), "{text}");
+        // At 80×24 the steps fit beside the logo.
+        assert!(screen(&app, 80, 24).contains("1 Select › 2 Review › 3 Done"));
     }
 
     #[test]

@@ -4,6 +4,10 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 
 ## [Unreleased]
 
+### Changed
+
+- The menu guides you through installing: a `1 Select › 2 Review › 3 Done` line under the title shows the current step, the status line says how many components are marked and to press Enter, and with marks the footer leads with `enter review & install`. In the plan, Enter applies like `y`, only Esc, `n`, `q`, Backspace, or ← go back, and other keys do nothing (any key used to discard the plan). The plan's title names what it does (`Plan: install 2, remove 1`), and `q` with components marked asks before quitting.
+
 ### Fixed
 
 - Installer releases build the Apple Silicon macOS binary again: dist 0.34.0 builds it on `macos-15`, since GitHub retired the `macos-14` runner on 2026-11-02 and cancelled that build.
