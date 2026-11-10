@@ -64,7 +64,7 @@ git add .agents .claude && git commit -m "Add afk components"
 
 | Command | Effect |
 | --- | --- |
-| `afk` | The menu (on a terminal): space or a number marks a component to install or remove, `u` marks updates, `g` switches to the global scope, Enter shows the plan, `y` applies it |
+| `afk` | The menu (on a terminal): space or a number marks a component to install or remove, `u` marks updates, `g` switches to the global scope, Enter shows the plan, Enter or `y` applies it and Esc goes back; with components marked, `q` asks before quitting |
 | `afk --list` | Status of every component, in this project and globally |
 | `afk NAME…` · `--all` | Install components and what they require |
 | `afk --update [NAME…]` | After upgrading the installer: refresh what changed, restore deleted copies, add new requirements |
