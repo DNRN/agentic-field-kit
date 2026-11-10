@@ -4,11 +4,14 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-10
+
 ### Added
 
 - The menu's details pane says what each component does, in a few sentences under its one-line summary, from a new `details` column in `catalog.tsv` ([ADR 0020](docs/adr/0020-catalog-details-column.md)).
 - `feature-planning` skill: before a feature is built, fetches its whole description from the project's tracker (issue, comments, linked items) or asks for one, maps what it touches and makes obsolete, writes a plan in `docs/plans/<slug>.md`, and refines it with the user in question rounds until it is approved; architectural decisions go to `adr-planning`. It records the project's tracker (or `none`) and scout model in a `## Feature planning` section of `AGENTS.md`. Small, fully specified changes skip it ([ADR 0021](docs/adr/0021-feature-planning-owns-feature-planning.md), [plan](docs/plans/feature-planning.md)).
 - `feature-scout` agent (Claude Code): read-only impact and deprecation mapping for `feature-planning`, in a fresh context.
+- `scripts/prepare-release.sh [major|minor|patch]` prepares a release from `main`: shows the latest GitHub release, asks whether the new one is major, minor, or patch (suggesting one from the sections under `[Unreleased]`), switches to a new `release-X.Y.Z` branch, dates those entries, updates the compare links, sets the version in `plugin.json`, `installer/Cargo.toml`, and `Cargo.lock`, and runs `tests/run.sh` ([README](README.md#releasing)).
 
 ### Changed
 
@@ -86,7 +89,8 @@ First release.
 
 - `./install.sh` installs into `~/.agents/skills` only (Codex, Gemini CLI, OpenCode, Cursor, omp). A copy in `~/.claude/skills` hid the plugin's `agentic-toolkit:*` skills in Claude Code, so that target is now opt-in (`--harness claude`) for Claude Code without the plugin. `--remove` still clears every target.
 
-[Unreleased]: https://github.com/DNRN/agentic-field-kit/compare/afk--v0.4.0...HEAD
+[Unreleased]: https://github.com/DNRN/agentic-field-kit/compare/afk--v0.5.0...HEAD
+[0.5.0]: https://github.com/DNRN/agentic-field-kit/compare/afk--v0.4.0...afk--v0.5.0
 [0.4.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.3.0...afk--v0.4.0
 [0.3.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.2.0...agentic-toolkit--v0.3.0
 [0.2.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.1.0...agentic-toolkit--v0.2.0

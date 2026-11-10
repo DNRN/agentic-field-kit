@@ -168,6 +168,7 @@ The installer is a native Windows program; it needs no Git Bash or WSL. Project 
 | [`policies/`](policies/) | Permission allow/deny presets | Copy into project settings |
 | [`evals/`](evals/) | Golden tasks per component in `claude plugin eval` format, scored against a no-plugin baseline | [`claude plugin eval .`](evals/README.md#run) |
 | [`tests/`](tests/) | Deterministic regression tests for hooks, the installer, `catalog.tsv`, and release metadata | `tests/run.sh` |
+| [`scripts/`](scripts/) | Maintainer scripts: `prepare-release.sh` cuts a release branch | [Releasing](#releasing) |
 | [`installer/`](installer/) | The Rust installer `afk`: command line and terminal UI, with the components built in ([plan](docs/plans/rust-installer.md)) | `cargo build --release` |
 | `catalog.tsv` | Every installable component: kind, path, harnesses, requirements, a one-line summary, and a few sentences of details for the menu ([ADR 0007](docs/adr/0007-component-catalog.md), [ADR 0020](docs/adr/0020-catalog-details-column.md)) | Read by the installer |
 | [`assets/brand/`](assets/brand/) | The Entropy Fox name and logo the installer shows; not MIT ([ADR 0011](docs/adr/0011-brand-assets-not-mit.md)) | Built into the installer |
@@ -187,11 +188,24 @@ The installer is a native Windows program; it needs no Git Bash or WSL. Project 
 
 Users of the plugin get a new release only when `version` in `.claude-plugin/plugin.json` changes; with an unchanged version, `claude plugin update` reports the plugin as current.
 
-1. Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a new `## [X.Y.Z] - YYYY-MM-DD` heading and add its compare link at the bottom.
-2. Set the same `X.Y.Z` in `.claude-plugin/plugin.json` and `installer/Cargo.toml`, then run `cargo build` to update `Cargo.lock` (semver: minor for new components or behavior, patch for fixes; a breaking rename or removal is a major once past 1.0).
-3. `tests/run.sh` (fails if the versions differ or have no dated changelog entry), then commit and merge to `main`.
-4. On the merge commit in `main`, with a clean working tree: `git tag afk--vX.Y.Z && git push origin afk--vX.Y.Z` tags the plugin release. The name is `plugin.json`'s `name` and `version`; the CHANGELOG's compare links use it.
-5. `git tag installer/vX.Y.Z && git push origin installer/vX.Y.Z` starts [`installer-release.yml`](.github/workflows/installer-release.yml), which builds the installer for every platform and publishes the GitHub release with its install scripts. dist can't read the plugin's tag, so the installer has its own.
+Releases are cut from `main` with [`scripts/prepare-release.sh`](scripts/prepare-release.sh). It needs [`gh`](https://cli.github.com), signed in.
+
+1. **Prepare.** From an up-to-date `main` with no uncommitted changes:
+
+   ```bash
+   git switch main && git pull
+   scripts/prepare-release.sh            # or: scripts/prepare-release.sh minor
+   ```
+
+   The script shows the latest GitHub release and what `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) holds, then asks whether the release is major, minor, or patch; an argument skips the question. Enter takes the suggestion from the changelog: a `**Breaking:**` entry or a `### Removed` section is major (minor while 0.x), `### Added`, `### Changed`, or `### Deprecated` is minor, and only `### Fixed` or `### Security` is patch. It then switches to a new `release-X.Y.Z` branch, so the branch always matches the version, and on it:
+   - moves the `[Unreleased]` entries under `## [X.Y.Z] - YYYY-MM-DD` and updates the compare links at the bottom;
+   - sets `X.Y.Z` in `.claude-plugin/plugin.json`, `installer/Cargo.toml`, and `Cargo.lock`;
+   - runs `tests/run.sh`, which fails if the versions differ or have no dated changelog entry.
+
+   It refuses to start off `main`, with uncommitted changes, with `main` behind `origin/main`, with an empty `[Unreleased]`, with an existing branch or tag for the version, or when `plugin.json` or the newest changelog release differs from the latest GitHub release (a release that was prepared but never tagged).
+2. **Merge.** Review the diff, then `git commit -am "Release X.Y.Z"`, `git push -u origin release-X.Y.Z`, `gh pr create --fill`, and merge the PR once CI passes.
+3. **Tag the plugin.** On the merge commit in `main`, with a clean working tree: `git tag afk--vX.Y.Z && git push origin afk--vX.Y.Z`. The name is `plugin.json`'s `name` and `version`; the CHANGELOG's compare links use it.
+4. **Publish the installer.** `git tag installer/vX.Y.Z && git push origin installer/vX.Y.Z` starts [`installer-release.yml`](.github/workflows/installer-release.yml), which builds the installer for every platform and publishes the GitHub release with its install scripts. dist can't read the plugin's tag, so the installer has its own. This GitHub release is the one the next `prepare-release.sh` starts from.
 
 ## Contributing
 
