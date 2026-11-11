@@ -4,6 +4,8 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-11
+
 ### Added
 
 - afk tells you when a newer release is out, and `afk --update` installs it. On a terminal, the menu header and `afk --list` name the new version and `afk --update`. The answer comes from GitHub at most once a day, in the background; offline, afk shows what its last successful check found. `afk --update` now updates afk itself first, through the install receipt that the install script writes. It asks before doing so, unless you pass `--yes`, and then refreshes the components with the new version; outside a project it updates afk only. An afk installed with `cargo install` gets the command to update it instead. Without a terminal and without `--yes`, `--update` doesn't touch the binary. `AFK_NO_UPDATE_CHECK=1` turns off every request ([ADR 0022](docs/adr/0022-afk-updates-itself.md), [plan](docs/plans/self-update.md)). This works from the release after 0.5.0: reinstall 0.5.0 or older once with the install script.
@@ -101,7 +103,8 @@ First release.
 
 - `./install.sh` installs into `~/.agents/skills` only (Codex, Gemini CLI, OpenCode, Cursor, omp). A copy in `~/.claude/skills` hid the plugin's `agentic-toolkit:*` skills in Claude Code, so that target is now opt-in (`--harness claude`) for Claude Code without the plugin. `--remove` still clears every target.
 
-[Unreleased]: https://github.com/DNRN/agentic-field-kit/compare/afk--v0.5.0...HEAD
+[Unreleased]: https://github.com/DNRN/agentic-field-kit/compare/afk--v0.6.0...HEAD
+[0.6.0]: https://github.com/DNRN/agentic-field-kit/compare/afk--v0.5.0...afk--v0.6.0
 [0.5.0]: https://github.com/DNRN/agentic-field-kit/compare/afk--v0.4.0...afk--v0.5.0
 [0.4.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.3.0...afk--v0.4.0
 [0.3.0]: https://github.com/DNRN/agentic-field-kit/compare/agentic-toolkit--v0.2.0...agentic-toolkit--v0.3.0
