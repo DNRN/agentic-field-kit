@@ -21,6 +21,8 @@ fi
 
 export HOME="$TMP/home"
 mkdir -p "$HOME"
+# Never ask GitHub for a newer afk (ADR 0022), whatever a test runs.
+export AFK_NO_UPDATE_CHECK=1
 
 # A private toolkit tree, so tests can change components "upstream"; the
 # installer reads it with --source, as a contributor would.
@@ -404,6 +406,22 @@ check "built in: global installs are copies" holds '[ -d "$HOME/.agents/skills/a
 "$BIN" --global --remove >/dev/null
 "$BIN" --check >/dev/null; rc=$?
 check "built in: --check passes for the built-in skills" [ "$rc" -eq 0 ]
+
+# ---- newer release (ADR 0022): only the paths without a network request ---------
+# A cache that saw 99.0.0 just now, where each OS looks for it.
+CACHE="$TMP/cache"
+for d in "$CACHE" "$HOME/Library/Caches"; do
+  mkdir -p "$d/agentic-field-kit" && printf '99.0.0 %s\n' "$(date +%s)" > "$d/agentic-field-kit/latest-release"
+done
+CACHE_ENV="$CACHE"
+[ "$WINDOWS" = 1 ] && CACHE_ENV="$(cygpath -w "$CACHE")"
+cached() { (cd "$P" && AFK_NO_UPDATE_CHECK='' XDG_CACHE_HOME="$CACHE_ENV" LOCALAPPDATA="$CACHE_ENV" "$@" 2>&1); }
+out=$(cached "$BIN" --update); rc=$?
+check "update notice: without a terminal, --update names the cached release and refreshes" holds '[ "$rc" -eq 0 ] && printf "%s" "$out" | grep -q "afk 99.0.0 is available: run afk --update on a terminal, or add --yes" && printf "%s" "$out" | grep -q "code-review: up to date"'
+out=$(cached "$I" --update)
+check "update notice: --source has no binary step" holds '! printf "%s" "$out" | grep -q "is available"'
+out=$(cached "$BIN" --list)
+check "update notice: --list without a terminal shows none" holds '! printf "%s" "$out" | grep -q "is available"'
 cd "$TMP" || exit 1
 
 [ "$fails" -eq 0 ] && echo "install: all passed" || echo "install: $fails failed"

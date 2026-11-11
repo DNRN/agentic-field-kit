@@ -1,6 +1,8 @@
+use std::env;
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::PathBuf;
-use std::process::ExitCode;
+use std::process::{Command as Process, ExitCode};
+use std::time::Duration;
 
 use clap::Parser;
 
@@ -9,6 +11,7 @@ use agentic_field_kit::engine::{self, Action, Mode, Options, Plan};
 use agentic_field_kit::scope::{self, Scope, home};
 use agentic_field_kit::source::Source;
 use agentic_field_kit::status::Ctx;
+use agentic_field_kit::update::{self, Binary};
 use agentic_field_kit::{agents, check, list, newproject, tui};
 
 /// Install afk components into a project or globally.
@@ -29,7 +32,8 @@ struct Args {
     /// Validate skills against the Agent Skills portability rules
     #[arg(long)]
     check: bool,
-    /// Refresh what changed upstream, restore deleted copies, add new requirements
+    /// Update afk itself to the latest release, then refresh what changed
+    /// upstream, restore deleted copies, add new requirements
     #[arg(long)]
     update: bool,
     /// Remove what this installer installed
@@ -195,6 +199,83 @@ fn warn_both_scopes(ctx: &Ctx, plan: &Plan, run: &Run) -> bool {
     ok
 }
 
+/// Whether to look for a newer afk for the notice (ADR 0022): on a terminal,
+/// with the built-in components, and not turned off.
+fn checking(ctx: &Ctx) -> bool {
+    is_tty() && ctx.source.dir().is_none() && !update::off()
+}
+
+/// The binary step of `--update` (ADR 0022). `None`: go on and refresh the
+/// components in this process. `Some`: this process is done, with that
+/// exit status. `refresh` says whether there is a scope to refresh.
+fn update_binary(ctx: &Ctx, run: &Run, refresh: bool) -> Option<ExitCode> {
+    if !run.yes && !is_tty() {
+        // Unattended: no network request, nothing replaced.
+        if let Some(newer) = update::cached(&ctx.version, &ctx.home) {
+            println!("afk {newer} is available: run afk --update on a terminal, or add --yes");
+        }
+        return None;
+    }
+    let replace = match update::binary(&ctx.version, &ctx.home) {
+        Ok(Binary::Current) => {
+            println!("afk {} is the latest release.", ctx.version);
+            return None;
+        }
+        Ok(Binary::Manual(latest)) => {
+            println!(
+                "afk {latest} is available. Its install script didn't install this afk; update it with: {}",
+                update::MANUAL
+            );
+            return None;
+        }
+        Ok(Binary::Replace(replace)) => replace,
+        Err(e) => {
+            eprintln!("afk: can't check for a newer afk: {e}");
+            return None;
+        }
+    };
+    let (old, new) = (&ctx.version, replace.latest.clone());
+    if run.dry_run {
+        println!("Would update afk {old} → {new}, then refresh components with it.");
+        return None;
+    }
+    if !run.yes && !confirm(&format!("Update afk {old} → {new}?")) {
+        return None;
+    }
+    // Before the update: on Linux the replaced file's link reads "(deleted)".
+    let exe = match env::current_exe() {
+        Ok(exe) => exe,
+        Err(e) => {
+            eprintln!("afk: can't find this afk's path: {e}");
+            return Some(ExitCode::FAILURE);
+        }
+    };
+    if let Err(e) = replace.apply() {
+        eprintln!("afk: the update to {new} failed: {e}");
+        return Some(ExitCode::FAILURE);
+    }
+    println!("Updated afk {old} → {new}.");
+    if !refresh {
+        println!("Run afk --update in each project to refresh its components.");
+        return Some(ExitCode::SUCCESS);
+    }
+    // Components come from the new binary: run it with the same arguments.
+    match Process::new(&exe)
+        .args(env::args_os().skip(1))
+        .env(update::UPDATED_VAR, "1")
+        .status()
+    {
+        Ok(status) => Some(ExitCode::from(
+            u8::try_from(status.code().unwrap_or(1)).unwrap_or(1),
+        )),
+        Err(e) => {
+            eprintln!("afk: can't start the new afk: {e}");
+            eprintln!("Next: run afk --update again to refresh the components.");
+            Some(ExitCode::FAILURE)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     // Usage errors exit 1; --help and --version exit 0.
     let args = match Args::try_parse() {
@@ -335,7 +416,10 @@ fn main() -> ExitCode {
 
     let action = match command {
         Command::List => {
-            print!("{}", list::table(&ctx, why.as_deref()));
+            let newer = checking(&ctx)
+                .then(|| update::check(&ctx.version, &ctx.home).wait(Duration::from_secs(2)))
+                .flatten();
+            print!("{}", list::table(&ctx, why.as_deref(), newer.as_deref()));
             return ExitCode::SUCCESS;
         }
         Command::Menu => {
@@ -347,11 +431,16 @@ fn main() -> ExitCode {
                     .as_deref()
                     .is_some_and(|w| w.starts_with(scope::NO_REPO));
             let home = ctx.home.clone();
+            let check = checking(&ctx).then(|| update::check(&ctx.version, &ctx.home));
             let mut app = tui::App::new(ctx, opts, args.global, args.dry_run, why);
             if new_project && let Ok(cwd) = std::env::current_dir() {
                 app.start_new_project(&dunce::canonicalize(&cwd).unwrap_or(cwd));
             }
-            let out = match tui::run(app) {
+            let later = check.and_then(|check| {
+                app.newer = check.newer;
+                check.later
+            });
+            let out = match tui::run(app, later) {
                 Ok(out) => out,
                 Err(e) => return die(&e.to_string()),
             };
@@ -380,6 +469,18 @@ fn main() -> ExitCode {
         }
         Command::Act(action) => action,
     };
+    let flags = Run {
+        dry_run: args.dry_run,
+        yes: args.yes,
+    };
+    if action == Action::Update
+        && ctx.source.dir().is_none()
+        && !update::off()
+        && !update::updated()
+        && let Some(code) = update_binary(&ctx, &flags, args.global || ctx.root.is_some())
+    {
+        return code;
+    }
     let scope = if args.global {
         Scope::Global
     } else if ctx.root.is_some() {
@@ -393,10 +494,6 @@ fn main() -> ExitCode {
             }
         }
         return code;
-    };
-    let flags = Run {
-        dry_run: args.dry_run,
-        yes: args.yes,
     };
     match run(&ctx, &opts, &flags, action, scope, &args.names, args.all) {
         Ok(true) => ExitCode::SUCCESS,

@@ -63,7 +63,7 @@ flowchart LR
 
 - `engine` holds every rule that `install.sh` has today: scopes and refusals, legacy detection, status precedence, the plan for install, update, and remove, `ask-remove` confirmation, path filtering of manifest rows, form (link or copy) per global path. `cli` and `tui` only build requests and render plans.
 - `source` is an enum over "the toolkit": `Embedded` (the files `installer/build.rs` builds in with `include_bytes!`: `catalog.tsv`, `.claude-plugin/plugin.json`, and every path the catalog lists) and `Dir(PathBuf)` for `--source`.
-- Crates: `ratatui` (with its crossterm backend, `ratatui::crossterm`), `clap`, `sha2`, `dunce`. No async runtime, no network.
+- Crates: `ratatui` (with its crossterm backend, `ratatui::crossterm`), `clap`, `sha2`, `dunce`. No async runtime, no network. [ADR 0022](../adr/0022-afk-updates-itself.md) later added `axoupdater`, `reqwest`, and `tokio` for the self-update ([afk updates itself](self-update.md)).
 - Layout: a Cargo workspace at the repository root with one crate in `installer/`, so `cargo` and dist work from the root and the component folders stay as they are.
 
 ## Compatibility contract
@@ -171,4 +171,4 @@ Setup guides per tool and harness as `docs/guides/*.md`, built into the binary l
 ## Out of scope
 
 - `commit-gate` outside the plugin ([selective install S5](selective-install.md#s5-commit-gate-outside-the-plugin)): done in [roadmap phase 1](phase1-enforce-themes.md#p3-hook-kind-in-the-installer), the `hook` kind.
-- Self-update (`agentic-toolkit self update`), Homebrew, Scoop, and package signing: after 0.3.0, if users ask.
+- Self-update: done in [afk updates itself](self-update.md) as `afk --update` ([ADR 0022](../adr/0022-afk-updates-itself.md)). Homebrew, Scoop, and package signing: after 0.3.0, if users ask.

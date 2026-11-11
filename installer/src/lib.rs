@@ -17,3 +17,4 @@ pub mod scope;
 pub mod source;
 pub mod status;
 pub mod tui;
+pub mod update;
