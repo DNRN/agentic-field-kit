@@ -29,8 +29,9 @@ pub fn name_width<'a>(names: impl IntoIterator<Item = &'a str>) -> usize {
         .max(14)
 }
 
-/// `why` is the reason there is no project, when there is none.
-pub fn table(ctx: &Ctx, why: Option<&str>) -> String {
+/// `why` is the reason there is no project, when there is none; `newer` a
+/// newer afk release (ADR 0022).
+pub fn table(ctx: &Ctx, why: Option<&str>, newer: Option<&str>) -> String {
     let mut out = String::new();
     let mut plug = "not enabled";
     match (&ctx.root, why) {
@@ -50,6 +51,9 @@ pub fn table(ctx: &Ctx, why: Option<&str>) -> String {
             )
             .unwrap();
         }
+    }
+    if let Some(newer) = newer {
+        writeln!(out, "afk {newer} is available: run afk --update").unwrap();
     }
     if plug == "not enabled" && plugin_on(&ctx.home) {
         plug = "enabled for your user";
@@ -140,4 +144,34 @@ pub fn table(ctx: &Ctx, why: Option<&str>) -> String {
         .unwrap();
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::catalog::Catalog;
+    use crate::source::Source;
+
+    fn ctx(dir: &std::path::Path) -> Ctx {
+        let source = Source::Embedded;
+        Ctx {
+            version: source.version(),
+            catalog: Catalog::parse(&source.catalog_text().unwrap()),
+            source,
+            root: Some(dir.join("project")),
+            home: dir.join("home"),
+        }
+    }
+
+    #[test]
+    fn the_header_names_a_newer_release_only_when_there_is_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = ctx(dir.path());
+        let with = table(&ctx, None, Some("9.9.9"));
+        assert_eq!(
+            with.lines().nth(1),
+            Some("afk 9.9.9 is available: run afk --update")
+        );
+        assert!(!table(&ctx, None, None).contains("is available"));
+    }
 }

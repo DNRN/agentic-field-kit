@@ -4,6 +4,10 @@ Notable changes to Agentic Field Kit (afk; agentic-toolkit before 0.4.0). Format
 
 ## [Unreleased]
 
+### Added
+
+- afk tells you when a newer release is out, and `afk --update` installs it. On a terminal, the menu header and `afk --list` name the new version and `afk --update`. The answer comes from GitHub at most once a day, in the background; offline, afk shows what its last successful check found. `afk --update` now updates afk itself first, through the install receipt that the install script writes. It asks before doing so, unless you pass `--yes`, and then refreshes the components with the new version; outside a project it updates afk only. An afk installed with `cargo install` gets the command to update it instead. Without a terminal and without `--yes`, `--update` doesn't touch the binary. `AFK_NO_UPDATE_CHECK=1` turns off every request ([ADR 0022](docs/adr/0022-afk-updates-itself.md), [plan](docs/plans/self-update.md)). This works from the release after 0.5.0: reinstall 0.5.0 or older once with the install script.
+
 ### Changed
 
 - The menu guides you through installing: a `1 Select › 2 Review › 3 Done` line under the title shows the current step, the status line says how many components are marked and to press Enter, and with marks the footer leads with `enter review & install`. In the plan, Enter applies like `y`, only Esc, `n`, `q`, Backspace, or ← go back, and other keys do nothing (any key used to discard the plan). The plan's title names what it does (`Plan: install 2, remove 1`), and `q` with components marked asks before quitting.

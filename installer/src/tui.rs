@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::{Receiver, TryRecvError};
+use std::time::Duration;
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Constraint, Flex, Layout, Rect};
@@ -131,6 +133,8 @@ pub struct App {
     pub handoff: Option<(&'static Agent, PathBuf)>,
     /// Agents the new project flow can start: those on PATH.
     pub agents: Vec<&'static Agent>,
+    /// A newer afk release, for the notice (ADR 0022).
+    pub newer: Option<String>,
 }
 
 impl App {
@@ -166,6 +170,7 @@ impl App {
             review_seen_end: Cell::new(false),
             handoff: None,
             agents: agents::available(),
+            newer: None,
         };
         app.refresh();
         app
@@ -895,13 +900,23 @@ const START_KEYS: &str = "↑↓ move · enter choose · h here · s subfolder �
 const NAME_KEYS: &str = "enter create · esc back";
 const PICK_KEYS: &str = "↑↓ move · enter/1-9 start · q don't start";
 
-/// The brand line both start screens open with.
+/// The brand line the start screens and the menu's header open with, and
+/// the notice when a newer release exists (ADR 0022).
 fn title_line(app: &App) -> Line<'static> {
-    Line::from(vec![
+    let mut spans = vec![
         Span::styled(brand::NAME, accent()),
         Span::styled(" · ", dim()),
         Span::raw(format!("Agentic Field Kit {}", app.ctx.version)),
-    ])
+    ];
+    if let Some(newer) = &app.newer {
+        spans.extend([
+            Span::styled(" · ", dim()),
+            Span::styled(format!("{newer} available"), accent()),
+            Span::styled(" · ", dim()),
+            Span::styled("afk --update", title()),
+        ]);
+    }
+    Line::from(spans)
 }
 
 /// The new project screen: the folder first, then the choices (ADR 0016).
@@ -1059,11 +1074,7 @@ fn header(app: &App) -> Vec<Line<'static>> {
         Line::from(vec![Span::styled(name, label()), Span::raw(value)])
     };
     vec![
-        Line::from(vec![
-            Span::styled(brand::NAME, accent()),
-            Span::styled(" · ", dim()),
-            Span::raw(format!("Agentic Field Kit {}", ctx.version)),
-        ]),
+        title_line(app),
         steps(app),
         field("Project  ", project),
         field("Plugin   ", plugin.to_owned()),
@@ -1476,12 +1487,27 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
 /// Runs the UI until the user quits; the terminal is restored on every exit,
 /// including a panic. Returns the lines applied, for the scrollback, and
-/// whether everything applied could be done.
-pub fn run(mut app: App) -> io::Result<Outcome> {
+/// whether everything applied could be done. `later` is the version check
+/// still running: its answer replaces `app.newer` when it comes.
+pub fn run(mut app: App, mut later: Option<Receiver<Option<String>>>) -> io::Result<Outcome> {
     let mut terminal: DefaultTerminal = ratatui::init();
     let result = (|| -> io::Result<()> {
         while !app.quit {
             terminal.draw(|frame| draw(frame, &app))?;
+            // While the check runs, wake up now and then to show its answer.
+            if let Some(rx) = &later
+                && !event::poll(Duration::from_millis(200))?
+            {
+                match rx.try_recv() {
+                    Ok(newer) => {
+                        app.newer = newer;
+                        later = None;
+                    }
+                    Err(TryRecvError::Disconnected) => later = None,
+                    Err(TryRecvError::Empty) => {}
+                }
+                continue;
+            }
             if let Event::Key(key) = event::read()? {
                 app.on_key(key);
             }
@@ -1653,6 +1679,20 @@ mod tests {
         assert!(matches!(app.screen, Screen::Result(_)));
         assert!(f.project.join(".agents/skills/doc-sync/SKILL.md").is_file());
         assert_eq!(app.rows[n - 1].project, "installed");
+    }
+
+    #[test]
+    fn the_header_names_a_newer_release_and_how_to_get_it() {
+        let f = fixture();
+        let mut app = app(&f);
+        assert!(!screen(&app, 120, 30).contains("available"));
+        app.newer = Some("9.9.9".to_owned());
+        let shown = screen(&app, 120, 30);
+        let line = shown
+            .lines()
+            .find(|l| l.contains("Agentic Field Kit"))
+            .unwrap();
+        assert!(line.contains("9.9.9 available · afk --update"), "{line}");
     }
 
     #[test]

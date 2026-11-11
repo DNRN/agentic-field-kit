@@ -4,7 +4,7 @@ Date: 2026-10-28
 
 ## Status
 
-Accepted
+Accepted. The updating part superseded by [0022](0022-afk-updates-itself.md).
 
 Plan: [Rust installer](../plans/rust-installer.md). Related: [ADR 0008](0008-project-install-manifest.md) (manifest and hash), [ADR 0009](0009-installer-in-rust.md) (Rust installer).
 

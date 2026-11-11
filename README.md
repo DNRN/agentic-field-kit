@@ -67,7 +67,7 @@ git add .agents .claude && git commit -m "Add afk components"
 | `afk` | The menu (on a terminal): space or a number marks a component to install or remove, `u` marks updates, `g` switches to the global scope, Enter shows the plan, Enter or `y` applies it and Esc goes back; with components marked, `q` asks before quitting |
 | `afk --list` | Status of every component, in this project and globally |
 | `afk NAME…` · `--all` | Install components and what they require |
-| `afk --update [NAME…]` | After upgrading the installer: refresh what changed, restore deleted copies, add new requirements |
+| `afk --update [NAME…]` | Update afk itself to the latest release, then refresh what changed, restore deleted copies, add new requirements |
 | `afk --remove [NAME…]` | Remove what the installer installed, and requirements nothing else needs |
 | `--project DIR` · `--global` | Scope: the git root of the working directory by default |
 | `--force` · `--dry-run` · `--yes` | Also overwrite or remove locally edited copies · print the plan only · don't ask |
@@ -84,7 +84,11 @@ Where a project install puts things ([ADR 0006](docs/adr/0006-project-scope-inst
 | `.agents/hooks/<name>.sh` | Git, through the clone's `pre-commit` hook: the commit gate, in every harness and in a terminal ([ADR 0014](docs/adr/0014-git-hook-layout.md)) |
 | `.agents/afk.tsv` | The installer: what it installed, why, and a content hash of each ([ADR 0008](docs/adr/0008-project-install-manifest.md)) |
 
-**Updating.** Install the new release the same way, then run `afk --update` in each project ([ADR 0010](docs/adr/0010-components-embedded-in-binary.md)). Components have no version numbers of their own. `--list` compares each copy with the hash recorded at install time and with the installer's: `outdated` (changed in the new release), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it), `inactive` (a hook whose copy is current but that git doesn't run in this clone yet). The installer never touches a file it didn't install (`foreign`).
+**Updating.** Run `afk --update` in each project ([ADR 0022](docs/adr/0022-afk-updates-itself.md)). When a newer release is out, it first asks to update afk itself (`--yes` doesn't ask, `--dry-run` only says so). It then refreshes the components with the new version; outside a project it updates afk only. Components have no version numbers of their own. They are built into afk ([ADR 0010](docs/adr/0010-components-embedded-in-binary.md)), so a new afk brings the new components. `--list` compares each copy with the hash recorded at install time and with the installer's: `outdated` (changed in the new release), `modified` (edited in the project; `--update` and `--remove` leave it alone without `--force`), `missing` (deleted by hand), `retired` (gone from the toolkit; `--update` asks before removing it), `inactive` (a hook whose copy is current but that git doesn't run in this clone yet). The installer never touches a file it didn't install (`foreign`).
+
+- **New releases.** On a terminal, the menu header (`X.Y.Z available · afk --update`) and `--list` (`afk X.Y.Z is available: run afk --update`) name a newer release. afk asks GitHub at most once a day, in the background, so the menu never waits. Offline, it shows what its last successful check found, or nothing if it has never checked. `AFK_NO_UPDATE_CHECK=1` turns off every request, including the one `--update` makes.
+- **What updates itself.** Only an afk that the install script installed (it leaves a receipt in `~/.config/agentic-field-kit/`, or `%LOCALAPPDATA%` on Windows). For a `cargo install`, `afk --update` prints the command to run instead. Without a terminal (CI, scripts), `--update` leaves afk alone unless you pass `--yes`.
+- afk 0.5.0 and older can't update themselves: install the next release once with the commands above.
 
 Harness notes, checked per harness ([evidence](docs/plans/selective-install.md#evidence)):
 
